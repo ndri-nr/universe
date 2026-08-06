@@ -7,6 +7,7 @@ Roadmap, in working order. Check items off as shipped.
 - [x] Accretion disk flare / instability event (timed brightness burst)
 
 ## 2. Milky Way scene
+- [x] switching tabs between planets with up down or left right buttons
 - [ ] Satellite galaxies (LMC/SMC) as small smudges at the disk edge
 - [ ] M31 (Andromeda) visible in the distance — sets up the 4.5 Gyr collision the ticker already mentions
 

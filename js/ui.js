@@ -197,7 +197,20 @@ export function setFocus(id){
   }
   publishState();
 }
-document.querySelectorAll('.bb').forEach(b => b.onclick = ()=> setFocus(+b.dataset.b));
+document.querySelectorAll('.bb[data-b]').forEach(b => b.onclick = ()=> setFocus(+b.dataset.b));
+
+/* ---------------- prev/next body cycling ----------------
+   Keyboard arrows and the PREV/NEXT chips both drive this — the arrows are
+   desktop-only, the on-screen buttons are what a touch user actually has. */
+const FOCUS_ORDER = [-1, 8, 0,1,2,3,4,5,6,7];   // FULL SYSTEM, SUN, MERCURY..NEPTUNE
+function cycleFocus(dir){
+  if(S.scene !== 'ss') return;
+  const idx = FOCUS_ORDER.indexOf(S.focus);
+  const next = FOCUS_ORDER[(idx + dir + FOCUS_ORDER.length) % FOCUS_ORDER.length];
+  setFocus(next);
+}
+$('bb-prev').onclick = ()=> cycleFocus(-1);
+$('bb-next').onclick = ()=> cycleFocus(1);
 
 /* ---------------- deep links ----------------
    State lives in the hash so a reload or a shared link lands on the same scene
@@ -281,6 +294,8 @@ window.addEventListener('keydown', e=>{
     const order = ['bh','mw','ss'];
     setScene(order[(order.indexOf(S.scene) + 1) % order.length]);
   }
+  if(k==='arrowright' || k==='arrowdown'){ e.preventDefault(); cycleFocus(1); }
+  if(k==='arrowleft'  || k==='arrowup'){   e.preventDefault(); cycleFocus(-1); }
 });
 window.addEventListener('resize', ()=>{
   autoCollapse();
