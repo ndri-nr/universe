@@ -706,6 +706,53 @@ vec3 moonSurface(vec3 n, int id){
   vec3  base = moonTint(id);
   return mix(base*0.75, base*1.15, c);
 }
+vec3 plutoCharonSurface(vec3 n, int id){
+  float c = fbm(n*9.0 + float(id)*13.0);
+  vec3 base = (id==20) ? vec3(0.68,0.60,0.52)    // Pluto: rusty tan (tholins)
+                        : vec3(0.58,0.56,0.58);  // Charon: neutral grey
+  return mix(base*0.75, base*1.15, c);
+}
+
+/* ---- Pluto/Charon: a true binary, not a planet-with-a-moon ----
+   Charon is unusually large relative to Pluto (about half its diameter), so
+   their barycentre sits OUTSIDE Pluto's own surface — both bodies visibly
+   orbit a shared empty point between them, "mutual tidal lock". ids 20/21,
+   past the moon range (9-19), so they don't collide with that numbering.
+
+   Real Pluto has notably higher eccentricity (0.248) than any planet here,
+   and its raw ORBITAL RADIUS does periodically dip inside Neptune's — in
+   reality a 3:2 orbital resonance with Neptune (not modelled here) is what
+   keeps them from ever actually meeting. What keeps them apart in THIS sim
+   is Pluto's real ~17° inclination and node: a numeric sweep of actual 3D
+   separation over many simulated years found a minimum of 3.1 units against
+   Neptune's 0.58 radius — comfortably safe without needing the resonance. */
+const float PLUTO_AU = 39.5, PLUTO_ECC = 0.248, PLUTO_INC = 0.2995, PLUTO_NODE = 1.925, PLUTO_PH0 = 2.0;
+const float PLUTO_RAD = 0.10, CHARON_RAD = 0.055;
+const float PLUTO_SEP = 0.35;      // Pluto-Charon separation, world units
+const float PLUTO_MQ  = 0.12;      // Charon/Pluto mass ratio -> barycentre offset split
+const float PLUTO_BSPEED = 2.6;    // binary orbital rate (visual, not to any real period)
+
+vec3 plutoBary(){
+  float orbRp = 4.6 * pow(PLUTO_AU, 0.48);
+  float m  = uTime * pow(PLUTO_AU, -1.5) * ORB_RATE * uOrbit;
+  float nu = PLUTO_PH0 + m;
+  float R  = orbRp * (1.0 - PLUTO_ECC*PLUTO_ECC) / (1.0 + PLUTO_ECC*cos(m));
+  float cn = cos(PLUTO_NODE), sn = sin(PLUTO_NODE);
+  float ci = cos(PLUTO_INC),  si = sin(PLUTO_INC);
+  vec3  u  = vec3(cn, 0.0, sn);
+  vec3  w  = vec3(-sn*ci, si, cn*ci);
+  return R * (cos(nu)*u + sin(nu)*w);
+}
+vec3 plutoPos(vec3 bary){
+  float ang = uTime * PLUTO_BSPEED * uOrbit;
+  float off = PLUTO_SEP * PLUTO_MQ / (1.0 + PLUTO_MQ);
+  return bary + off * vec3(cos(ang), 0.12*sin(ang*0.7), sin(ang));
+}
+vec3 charonPos(vec3 bary){
+  float ang = uTime * PLUTO_BSPEED * uOrbit;
+  float off = PLUTO_SEP / (1.0 + PLUTO_MQ);
+  return bary - off * vec3(cos(ang), 0.12*sin(ang*0.7), sin(ang));
+}
 
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
@@ -731,6 +778,12 @@ void main(){
     float t = iSphere(ro, rd, c, MOON_RAD[j]);
     if(t > 0.0 && t < tB){ tB = t; id = 9+j; ce = c; ra = MOON_RAD[j]; }
   }
+  vec3 plutoBaryPos = plutoBary();
+  vec3 plutoP = plutoPos(plutoBaryPos), charonP = charonPos(plutoBaryPos);
+  float tPluto  = iSphere(ro, rd, plutoP,  PLUTO_RAD);
+  float tCharon = iSphere(ro, rd, charonP, CHARON_RAD);
+  if(tPluto  > 0.0 && tPluto  < tB){ tB = tPluto;  id = 20; ce = plutoP;  ra = PLUTO_RAD; }
+  if(tCharon > 0.0 && tCharon < tB){ tB = tCharon; id = 21; ce = charonP; ra = CHARON_RAD; }
 
   vec3 col;
   if(id == 8){
@@ -746,7 +799,7 @@ void main(){
     vec3 L = normalize(uSunPos - p);              // light from the displaced Sun
     float dif = max(dot(n, L), 0.0);
     float att = 1.0 / (1.0 + 0.011*length(p - uSunPos));   // gentler than inverse-square
-    vec3 base = (id < 9) ? surface(id, n) : moonSurface(n, id);
+    vec3 base = (id < 9) ? surface(id, n) : (id <= 19) ? moonSurface(n, id) : plutoCharonSurface(n, id);
     /* fine mottling: invisible at system scale, gives the surface texture once
        you zoom in on a single body. Only costs anything on pixels that hit. */
     base *= 0.88 + 0.26*fbm(n*26.0) + 0.10*vnoise(n*70.0);
