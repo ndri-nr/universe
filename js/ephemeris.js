@@ -5,7 +5,10 @@
 import { S } from './state.js';
 
 export const P_AU  = [0.387, 0.723, 1.000, 1.524, 5.203, 9.537, 19.19, 30.07];
-export const P_RAD = [0.26,  0.40,  0.42,  0.32,  0.92,  0.80,  0.60,  0.58];
+/* Mercury..Mars halved from 0.26/0.40/0.42/0.32 — must match RAD in FS_SS
+   exactly, see the comment there (real eccentricity + the original radii
+   meant every adjacent inner-planet pair's spheres overlapped every orbit). */
+export const P_RAD = [0.13,  0.20,  0.21,  0.16,  0.92,  0.80,  0.60,  0.58];
 export const P_PH0 = [0.90,  2.30,  0.40,  3.90,  1.60,  5.10,  2.80,  4.40];
 /* real eccentricities/inclinations/nodes — must match ECC/INC/NODE in FS_SS
    exactly, same reason as the rest of this block: camera focus and

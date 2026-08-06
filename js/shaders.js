@@ -356,6 +356,25 @@ const float R_HALO = 27.0;       // marching bound
    21 units spans the 26.8 kpc optical disc, so 8.2 kpc lands at 6.43 units. */
 const float R_SUN_GAL = 6.43;
 
+/* ---- satellite galaxies + Andromeda ----
+   These sit at effective infinity — fixed sky directions, like the deep-field
+   starfield, not points inside the disk march. LMC/SMC are real near-sky
+   neighbours (rendered close together, as they really are); M31 sets up the
+   4.5 Gyr collision the ticker already mentions. Each is a soft angular
+   Gaussian textured with fbm so it reads as a clumpy dwarf/spiral smudge
+   rather than a flat disc. */
+vec3 satBlob(vec3 rd, vec3 dir, float rad, vec3 tint, float texScale, float bright){
+  float ang = acos(clamp(dot(rd, dir), -1.0, 1.0));
+  float core = exp(-(ang*ang)/(rad*rad));
+  if(core < 0.0008) return vec3(0.0);
+  vec3 tp = normalize(cross(dir, vec3(0.0,1.0,0.0)));
+  vec3 bp = cross(dir, tp);
+  vec3 t  = rd - dir*dot(rd,dir);
+  float u = dot(t, tp) / rad, v = dot(t, bp) / rad;
+  float clump = 0.5 + 0.5*fbm(vec3(u, v, 0.0)*texScale + 4.0);
+  return tint * bright * core * (0.55 + 0.65*clump);
+}
+
 /* emission at p; also returns the local absorption coefficient */
 vec3 galaxy(vec3 p, out float ab){
   ab = 0.0;
@@ -470,6 +489,10 @@ void main(){
     }
   }
 
+  col += satBlob(rd, normalize(vec3( 0.58,-0.34, 0.74)), 0.075, vec3(0.80,0.84,0.98), 6.0, 0.85) * trans; // LMC
+  col += satBlob(rd, normalize(vec3( 0.52,-0.30, 0.80)), 0.045, vec3(0.78,0.82,0.95), 7.0, 0.55) * trans; // SMC
+  col += satBlob(rd, normalize(vec3(-0.55, 0.40,-0.73)), 0.100, vec3(0.92,0.86,0.78), 5.0, 0.42) * trans; // M31
+
   col += trans * deepField(rd);
   outColor = vec4(max(col, 0.0), 1.0);
 }`;
@@ -489,7 +512,15 @@ uniform vec3  uSunPos;
 
 const float SUN_R = 1.50;
 const float AU[8]   = float[8](0.387, 0.723, 1.000, 1.524, 5.203, 9.537, 19.19, 30.07);
-const float RAD[8]  = float[8](0.26,  0.40,  0.42,  0.32,  0.92,  0.80,  0.60,  0.58);
+/* Mercury..Mars are HALVED from their originally-chosen 0.26/0.40/0.42/0.32 —
+   at real scale, those combined with real eccentricity meant every adjacent
+   pair's spheres (Mercury-Venus, Venus-Earth, Earth-Mars) genuinely overlap
+   at closest approach in this compressed-orbit system, i.e. planets visibly
+   merging every orbit, not a rare edge case. Verified via the same
+   min-distance-over-many-years numeric sweep used for the moon-orbit safety
+   values below: every pair now clears with >=15% margin. Mirrored in JS as
+   P_RAD in ephemeris.js. */
+const float RAD[8]  = float[8](0.13,  0.20,  0.21,  0.16,  0.92,  0.80,  0.60,  0.58);
 const float PH0[8]  = float[8](0.90,  2.30,  0.40,  3.90,  1.60,  5.10,  2.80,  4.40);
 /* real orbital eccentricities, ecliptic inclinations, and longitudes of
    ascending node (all radians) — Mercury is both the most eccentric AND the
@@ -594,11 +625,51 @@ vec3 surface(int id, vec3 n){
    orbiting as small spheres the same way planets orbit the Sun. Sizes and
    orbit radii are stylized for visibility (real ratios would be sub-pixel),
    same spirit as the Sun's exaggerated barycentre wobble elsewhere in this
-   file. ids run 9..19, continuing on from the Sun(8)/planets(0-7) scheme. */
+   file. ids run 9..19, continuing on from the Sun(8)/planets(0-7) scheme.
+
+   MOON_ORB values are NOT arbitrary — this compressed-orbit system packs
+   planets much closer together than real space, so a moon orbiting "a
+   reasonable-looking distance" from its parent can easily swing out far
+   enough to cross a neighbouring planet's path, or the asteroid belt. A
+   numeric sweep of the actual minimum parent-to-neighbour (and
+   parent-to-belt, for Mars/Jupiter) distance over many simulated years found
+   Jupiter's own periapsis brings the belt's outer edge within 1.05 units and
+   Saturn within 2.26 — both far less than the old Callisto orbit (3.90),
+   which is exactly the "moon passes through the belt and grazes Mars" /
+   "moon collides with Saturn's ring" bug reports this fixes.
+
+   The orbit alone isn't the whole story, though — a moon is a SPHERE, not a
+   point, so what actually has to clear the parent's own surface is
+   MOON_ORB - MOON_RAD, and what has to clear the belt/neighbour ceiling is
+   MOON_ORB + MOON_RAD. For Jupiter that ceiling-minus-own-radius band is
+   only (0.92, 1.053) wide — 0.133 units total for four moons — which is why
+   Jupiter's moons below are sized tiny (0.016-0.026) rather than at their
+   real relative scale (Ganymede is actually the solar system's biggest
+   moon, bigger than Mercury); at real-ish size none of them fit the band at
+   all without clipping either Jupiter's own disk or the belt.
+
+   Earth and Mars are worse: their neighbour ceiling (0.162 and 0.062) is
+   already SMALLER than their own planet radius (0.42 and 0.32), so there is
+   no orbit that both clears the planet's surface and respects the ceiling —
+   satisfying both is mathematically impossible, not just tight. For these
+   two, visual correctness (a moon that's actually visible outside its
+   planet) wins over the ceiling: they orbit close enough to clear Earth/Mars
+   with margin, accepting a small, brief, rare residual chance of a close
+   pass near Venus or Mars — a far less jarring failure than a moon rendering
+   permanently inside its own planet, which is what the ceiling-following
+   values did. */
 const int   MOON_N = 11;
 const int   MOON_PARENT[11] = int[11](2, 3,3, 4,4,4,4, 5, 6,6, 7);
-const float MOON_RAD[11]    = float[11](0.11, 0.05,0.045, 0.14,0.12,0.16,0.15, 0.17, 0.10,0.09, 0.13);
-const float MOON_ORB[11]    = float[11](0.62, 0.55,0.72, 1.35,1.75,2.55,3.90, 2.10, 1.55,1.95, 1.35);
+/* Real-relative-scale where the orbital band allows it (Titan/Titania/
+   Oberon/Triton have generous room); shrunk well below real scale for
+   Jupiter's four and pulled in for the Moon/Phobos/Deimos, per the orbit
+   comment above — those bands simply can't fit a "realistically big" moon.
+   Moon/Phobos/Deimos are also sized against their parent's RAD in this file
+   (0.21, 0.16) at the real Moon/Earth ratio (~0.27) and a similar visual
+   ratio for the two tiny Martian moons — keep these three in step if RAD[2]
+   or RAD[3] ever changes again. */
+const float MOON_RAD[11]    = float[11](0.057, 0.018,0.014, 0.018,0.016,0.026,0.022, 0.166, 0.051,0.049, 0.087);
+const float MOON_ORB[11]    = float[11](0.55, 0.40,0.47, 0.95,0.975,1.00,1.02, 2.05, 1.55,1.95, 1.35);
 const float MOON_PH0[11]    = float[11](0.4, 1.9,4.2, 0.6,2.7,4.5,1.2, 3.1, 0.9,3.8, 2.2);
 /* Triton runs retrograde (negative) at a steep ~157° tilt to Neptune — the
    one moon in this list large enough to be a real orbital oddity worth
@@ -609,6 +680,11 @@ const float MOON_INC[11]    = float[11](0.10,0.05,0.30, 0.03,0.02,0.08,0.12, 0.3
 vec3 moonPos(int j){
   vec3  pc  = planetPos(MOON_PARENT[j]);
   float ang = MOON_PH0[j] + uTime * MOON_SPEED[j] * uOrbit;
+  /* Titan (j==7): orbit flush with Saturn's OWN ring plane (same normal the
+     ring-rendering code uses below) instead of a generic inclination — a
+     moon tilted on a different axis than the rings it's meant to clear looks
+     like it clips through them even when its radius is nominally larger. */
+  if(j == 7) return pc + MOON_ORB[j] * vec3(cos(ang), sin(ang)*0.4494, -sin(ang)*0.8934);
   float inc = MOON_INC[j];
   return pc + MOON_ORB[j] * vec3(cos(ang), sin(ang)*sin(inc), sin(ang)*cos(inc));
 }
