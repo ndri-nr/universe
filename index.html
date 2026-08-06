@@ -769,11 +769,22 @@ vec3 galaxy(vec3 p, out float ab){
   float vert   = exp(-abs(p.y)/h);
   float radial = exp(-rho/6.6) * smoothstep(0.0, 1.5, rho);
 
-  /* logarithmic spiral: 2 dominant arms + 2 minor, rotating as a pattern */
+  /* logarithmic spiral: four major arms at their real, UNEVEN angular spacing
+     (Norma · Scutum-Centaurus · Sagittarius · Perseus are not 90° apart), each
+     its own ridge rather than one cos(2a)/cos(4a) harmonic — a single harmonic
+     always reads as "two strong, two faint" no matter the mix weight, which
+     undersells the arm count. Plus a short Orion-type spur peeling off one arm. */
   float ph = atan(p.z, p.x) + uTime*uRot*0.030;
   float a  = ph + log(max(rho, 0.4)) * 2.55;      // 2.55 = 1/tan(pitch angle)
-  float arms = mix(0.5+0.5*cos(2.0*a), 0.5+0.5*cos(4.0*a + 1.1), 0.40);
-  arms = pow(clamp(arms, 0.0, 1.0), mix(1.3, 5.2, clamp(uArm*0.5, 0.0, 1.0)));
+  float ridgePow = mix(1.2, 4.6, clamp(uArm*0.5, 0.0, 1.0));
+  float arms = 0.0;
+  arms = max(arms, pow(max(cos(a - 0.00), 0.0), ridgePow));
+  arms = max(arms, pow(max(cos(a - 1.75), 0.0), ridgePow));
+  arms = max(arms, pow(max(cos(a - 3.30), 0.0), ridgePow));
+  arms = max(arms, pow(max(cos(a - 4.95), 0.0), ridgePow));
+  float spur = pow(max(cos(a - 2.55), 0.0), ridgePow*1.8)
+             * smoothstep(4.5,7.5,rho) * (1.0-smoothstep(9.0,12.0,rho));
+  arms = clamp(max(arms, spur*0.55), 0.0, 1.0);
 
   /* clumping, carried around on a flat rotation curve (differential shear) */
   float om = 1.7 * pow(max(rho, 0.7), -0.55) * uRot;
@@ -801,8 +812,13 @@ vec3 galaxy(vec3 p, out float ab){
 
   float emit = dens*0.42 + spark*dens*1.30 + (bar*0.95 + bulge*0.25) * uCore;
 
-  /* dust lanes trail just inside each arm ridge */
-  float lane = pow(0.5+0.5*cos(2.0*(a - 0.44)), 3.5);
+  /* dust lanes trail just inside each arm ridge — same four phases, offset by
+     the same 0.44 rad the old single-harmonic version used */
+  float lane = 0.0;
+  lane = max(lane, pow(max(cos(a - 0.00 - 0.44), 0.0), 3.5));
+  lane = max(lane, pow(max(cos(a - 1.75 - 0.44), 0.0), 3.5));
+  lane = max(lane, pow(max(cos(a - 3.30 - 0.44), 0.0), 3.5));
+  lane = max(lane, pow(max(cos(a - 4.95 - 0.44), 0.0), 3.5));
   ab = (dens*1.05 + lane*vert*radial*2.5) * uDust * 0.60;
 
   return c * emit;
