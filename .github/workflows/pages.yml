@@ -46,9 +46,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # must exceed the deploy-pages timeout below, or the job is killed before the
-    # action gets to report anything useful
-    timeout-minutes: 55
+    # must exceed both deploy attempts below (15 min each), or the job is killed
+    # before the action gets to report anything useful
+    timeout-minutes: 35
     environment:
       name: github-pages
       # fall through to the retry's output, or the URL is blank whenever the
@@ -67,14 +67,15 @@ jobs:
         continue-on-error: true
         uses: actions/deploy-pages@v5
         with:
-          # 45 min against a 10 min default. The run that succeeded also polled
-          # `deployment_queued` repeatedly, so a slow queue is normal here rather
-          # than a fault — every failure aborted at exactly the default, which
-          # means the wait was too short, not that the deploy was dead.
-          timeout: 2700000
+          # 15 min. This was briefly set to 45 on the theory that the queue was
+          # merely slow; it is not. deploy-pages polls the deployment it created,
+          # and while two deployers race for one Pages slot the loser's
+          # deployment is never promoted — so waiting longer cannot help, it just
+          # parks a runner. 15 min is well clear of a genuine queue wait while
+          # letting a superseded run give up promptly.
+          timeout: 900000
           error_count: 20
-          # poll every 15s rather than 5s: at a 45 min ceiling the default fills
-          # the log with hundreds of identical status lines
+          # poll every 15s rather than 5s, to keep the log readable
           reporting_interval: 15000
 
       # One retry. Actions has no native step retry, hence continue-on-error on
@@ -86,6 +87,6 @@ jobs:
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
         with:
-          timeout: 2700000
+          timeout: 900000
           error_count: 20
           reporting_interval: 15000
