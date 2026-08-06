@@ -1,0 +1,268 @@
+:root{
+  --cy:#4ff0ff;
+  --cy-dim:#1b7f8c;
+  --am:#ffb457;
+  --mg:#ff5fd2;
+  --bg:#02040a;
+  --line:rgba(79,240,255,.22);
+  --panel:rgba(4,14,22,.42);
+  --mono: ui-monospace,"JetBrains Mono","Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--cy);font-family:var(--mono)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* ---------- HUD shell ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:1;transition:opacity .5s ease}
+#hud.off{opacity:0}
+.panel{
+  position:absolute;padding:10px 13px;
+  background:linear-gradient(160deg,rgba(6,20,30,.55),rgba(2,8,14,.30));
+  border:1px solid var(--line);
+  backdrop-filter:blur(6px) saturate(1.2);
+  -webkit-backdrop-filter:blur(6px) saturate(1.2);
+  box-shadow:0 0 22px rgba(0,0,0,.6), inset 0 0 40px rgba(79,240,255,.045);
+  clip-path:polygon(0 8px,8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%);
+}
+.panel::after{
+  content:"";position:absolute;left:0;top:0;width:2px;height:100%;
+  background:linear-gradient(180deg,transparent,var(--cy),transparent);opacity:.5;
+}
+.lbl{font-size:9px;letter-spacing:.28em;color:var(--cy-dim);text-transform:uppercase}
+
+/* title */
+#title{top:22px;left:24px;min-width:290px}
+#title h1{
+  margin:2px 0 4px;font-size:19px;letter-spacing:.42em;font-weight:500;
+  color:#dffcff;text-shadow:0 0 12px rgba(79,240,255,.85),0 0 34px rgba(79,240,255,.35);
+}
+#title .sub{font-size:9.5px;letter-spacing:.22em;color:rgba(79,240,255,.62)}
+#title .bar{margin-top:9px;height:2px;background:rgba(79,240,255,.14);overflow:hidden}
+#title .bar i{display:block;height:100%;width:38%;background:var(--cy);box-shadow:0 0 10px var(--cy);animation:sweep 3.4s cubic-bezier(.6,0,.4,1) infinite}
+@keyframes sweep{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
+
+/* telemetry */
+#tel{top:22px;right:24px;width:262px}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:10.5px;padding:3.2px 0;border-bottom:1px dashed rgba(79,240,255,.10)}
+.row:last-child{border-bottom:0}
+.row span{color:rgba(79,240,255,.55);letter-spacing:.14em;font-size:9px}
+.row b{font-weight:500;color:#eafcff;letter-spacing:.06em;text-shadow:0 0 8px rgba(79,240,255,.5)}
+.row b.warn{color:var(--am);text-shadow:0 0 8px rgba(255,180,87,.6)}
+.row b.crit{color:var(--mg);text-shadow:0 0 8px rgba(255,95,210,.6)}
+
+/* meters */
+#meters{bottom:24px;left:24px;width:250px}
+.meter{margin:7px 0 9px}
+.meter .t{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.18em;color:rgba(79,240,255,.6);margin-bottom:4px}
+.track{height:4px;background:rgba(79,240,255,.10);position:relative;overflow:hidden}
+.track i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--cy-dim),var(--cy));box-shadow:0 0 9px var(--cy);transition:width .18s linear}
+.track.am i{background:linear-gradient(90deg,#7a4a12,var(--am));box-shadow:0 0 9px var(--am)}
+.track.mg i{background:linear-gradient(90deg,#6d2057,var(--mg));box-shadow:0 0 9px var(--mg)}
+
+/* controls */
+#ctrl{bottom:24px;right:24px;width:266px;pointer-events:auto}
+#ctrl .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+#ctrl .hd .lbl{margin-right:auto}   /* keep the label beside the caret, em stays right */
+#ctrl .hd em{font-style:normal;font-size:8.5px;color:rgba(79,240,255,.4);letter-spacing:.2em}
+.ctl{margin:8px 0}
+.ctl > label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.16em;color:rgba(79,240,255,.66);margin-bottom:5px}
+.ctl > label var{font-style:normal;color:#eafcff}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:14px;background:transparent;cursor:crosshair;display:block}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:rgba(79,240,255,.20)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:9px;height:14px;margin-top:-6px;background:var(--cy);box-shadow:0 0 10px var(--cy);border:0;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+input[type=range]::-moz-range-track{height:2px;background:rgba(79,240,255,.20)}
+input[type=range]::-moz-range-thumb{width:9px;height:14px;border:0;border-radius:0;background:var(--cy);box-shadow:0 0 10px var(--cy)}
+.btns{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+button{
+  flex:1 1 auto;min-width:66px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;padding:7px 6px;
+  color:var(--cy);background:rgba(79,240,255,.06);border:1px solid rgba(79,240,255,.3);cursor:pointer;
+  transition:.16s;clip-path:polygon(0 5px,5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%);
+}
+button:hover{background:rgba(79,240,255,.18);box-shadow:0 0 16px rgba(79,240,255,.35);color:#eafcff}
+button.on{background:rgba(255,180,87,.16);border-color:rgba(255,180,87,.55);color:var(--am);box-shadow:0 0 16px rgba(255,180,87,.28)}
+
+/* generates no box on desktop, so its children keep absolute positioning */
+#topstack{display:contents}
+
+/* scene nav */
+#nav{position:absolute;left:50%;top:20px;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto;z-index:6}
+.navb .abbr{display:none}
+.navb{
+  flex:0 0 auto;min-width:132px;font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;padding:9px 16px;
+  color:rgba(79,240,255,.62);background:linear-gradient(160deg,rgba(6,20,30,.62),rgba(2,8,14,.38));
+  border:1px solid rgba(79,240,255,.20);cursor:pointer;transition:.18s;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  clip-path:polygon(0 7px,7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%);
+}
+.navb:hover{color:#dffcff;border-color:rgba(79,240,255,.45);background:rgba(79,240,255,.12)}
+.navb.on{
+  color:#eafcff;border-color:var(--cy);background:rgba(79,240,255,.17);
+  box-shadow:0 0 20px rgba(79,240,255,.32), inset 0 0 22px rgba(79,240,255,.10);
+  text-shadow:0 0 10px rgba(79,240,255,.8);
+}
+
+/* body selector */
+#bodies{top:132px;left:24px;width:158px;pointer-events:auto}
+.bb{
+  display:block;width:100%;text-align:left;font-family:var(--mono);font-size:8.5px;
+  letter-spacing:.14em;padding:5px 8px;margin:2px 0;color:rgba(79,240,255,.58);
+  background:rgba(79,240,255,.04);border:1px solid rgba(79,240,255,.14);cursor:pointer;transition:.14s;
+}
+.bb:hover{color:#dffcff;background:rgba(79,240,255,.14);border-color:rgba(79,240,255,.38)}
+.bb.on{color:var(--am);background:rgba(255,180,87,.14);border-color:rgba(255,180,87,.5);
+       box-shadow:0 0 12px rgba(255,180,87,.24)}
+
+/* per-scene HUD rows: body carries scene-bh / scene-mw / scene-ss */
+body.scene-bh [data-sc]:not([data-sc="bh"]),
+body.scene-mw [data-sc]:not([data-sc="mw"]),
+body.scene-ss [data-sc]:not([data-sc="ss"]){display:none}
+/* #bodies gets an ID-level hide too, so a later `#bodies{display:...}` rule
+   cannot silently out-specify the attribute selector above */
+body.scene-bh #bodies, body.scene-mw #bodies{display:none}
+
+/* reticle */
+#ret{position:absolute;left:50%;top:50%;width:230px;height:230px;transform:translate(-50%,-50%);opacity:.55}
+#ret svg{width:100%;height:100%;overflow:visible}
+.spin{transform-origin:115px 115px;animation:rot 26s linear infinite}
+.spin.rev{animation:rot 40s linear infinite reverse}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* corners + scan */
+.corner{position:absolute;width:26px;height:26px;border:1px solid rgba(79,240,255,.5)}
+.c1{top:12px;left:12px;border-right:0;border-bottom:0}
+.c2{top:12px;right:12px;border-left:0;border-bottom:0}
+.c3{bottom:12px;left:12px;border-right:0;border-top:0}
+.c4{bottom:12px;right:12px;border-left:0;border-top:0}
+#scan{position:absolute;left:0;right:0;height:130px;pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(79,240,255,.055) 60%,rgba(79,240,255,.13));
+  animation:scanmv 7.5s linear infinite}
+@keyframes scanmv{0%{top:-140px}100%{top:100%}}
+#grid{position:absolute;inset:0;opacity:.05;
+  background-image:linear-gradient(rgba(79,240,255,.7) 1px,transparent 1px),linear-gradient(90deg,rgba(79,240,255,.7) 1px,transparent 1px);
+  background-size:60px 60px}
+#vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 42%,rgba(0,4,8,.72) 100%)}
+
+/* ticker */
+#tick{position:absolute;left:0;right:0;bottom:0;height:22px;display:flex;align-items:center;
+  background:rgba(2,10,16,.55);border-top:1px solid rgba(79,240,255,.16);overflow:hidden}
+#tick div{white-space:nowrap;font-size:9px;letter-spacing:.24em;color:rgba(79,240,255,.5);animation:tk 44s linear infinite;padding-left:100%}
+@keyframes tk{to{transform:translateX(-100%)}}
+
+/* boot */
+#boot{position:fixed;inset:0;z-index:20;background:#010307;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;transition:opacity .7s ease}
+#boot.gone{opacity:0;pointer-events:none}
+#boot .log{width:min(430px,80vw);font-size:10px;line-height:1.85;letter-spacing:.1em;color:rgba(79,240,255,.72);min-height:132px}
+#boot .log b{color:var(--am);font-weight:400}
+#boot .pb{width:min(430px,80vw);height:3px;background:rgba(79,240,255,.13)}
+#boot .pb i{display:block;height:100%;width:0;background:var(--cy);box-shadow:0 0 12px var(--cy);transition:width .25s}
+#boot h2{margin:0;font-size:12px;letter-spacing:.5em;color:#cdf6ff;text-shadow:0 0 16px rgba(79,240,255,.7)}
+
+#hint{position:absolute;left:50%;bottom:46px;transform:translateX(-50%);font-size:9px;letter-spacing:.24em;
+  color:rgba(79,240,255,.42);text-align:center;transition:opacity .6s}
+#hint.hide{opacity:0}
+#err{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:30px;
+  background:#010307;color:var(--am);font-size:12px;line-height:1.7;text-align:center}
+
+/* ---------------- tablet ---------------- */
+@media(max-width:1024px){
+  #meters{display:none}
+  #title{min-width:0;width:252px}
+  #title h1{font-size:16px;letter-spacing:.32em}
+  #tel{width:238px}
+  #ctrl{width:242px}
+  #bodies{top:126px;width:146px}
+  .navb{min-width:110px;font-size:8.5px;letter-spacing:.18em;padding:8px 11px}
+  #ret{width:186px;height:186px}
+}
+
+/* ---------------- mobile ---------------- */
+@media(max-width:700px){
+  /* Stack the top panels in normal flow. This is the fix for the chip row
+     overlapping the title: nothing carries a hand-tuned per-scene `top`
+     any more, so each scene's panel set sizes and packs itself. */
+  #topstack{display:flex;flex-direction:column;gap:6px;
+            position:absolute;top:10px;left:10px;right:10px}
+  #topstack > #nav, #topstack > #title, #topstack > #tel, #topstack > #bodies{
+    position:static;top:auto;left:auto;right:auto;bottom:auto;
+    width:auto;min-width:0;transform:none
+  }
+
+  #nav{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+  .navb{min-width:0;font-size:8px;letter-spacing:.08em;padding:8px 3px;text-align:center}
+  .navb .full{display:none}
+  .navb .abbr{display:inline}
+
+  #title{padding:7px 10px}
+  #title h1{font-size:14px;letter-spacing:.26em;margin:1px 0 2px}
+  #title .sub{font-size:8px}
+  #title .bar{margin-top:5px}
+
+  /* two columns turn ~12 telemetry rows into ~6 short lines */
+  #tel{padding:8px 10px}
+  #tel .rows{display:grid;grid-template-columns:1fr 1fr;column-gap:12px}
+  .row{font-size:9px;padding:2.5px 0;overflow:hidden}
+  .row span{font-size:7.5px;letter-spacing:.06em;white-space:nowrap;
+            overflow:hidden;text-overflow:ellipsis}
+  .row b{white-space:nowrap}
+
+  /* MUST stay scoped to scene-ss. Bare "#bodies{display:flex}" carries ID
+     specificity (100) and beats the per-scene hide rule (31), which leaks the
+     chip row into every scene. */
+  body.scene-ss #bodies{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:3px;
+          padding:5px 6px;scrollbar-width:none;-ms-overflow-style:none}
+  #bodies::-webkit-scrollbar{height:0;width:0}   /* the 17px bar was eating the panel */
+  #bodies .lbl{display:none}
+  .bb{flex:0 0 auto;display:inline-block;width:auto;margin:0;font-size:7.5px;
+      letter-spacing:.06em;padding:5px 7px;white-space:nowrap}
+
+  /* collapsible, so the sliders stop covering 42% of the screen */
+  #ctrl{left:10px;right:10px;bottom:26px;width:auto;padding:8px 10px}
+  #ctrl .ctl{margin:3px 0}
+  #ctrl .ctl > label{margin-bottom:2px;font-size:8.5px}
+  #ctrl .btns{margin-top:8px}
+  #ctrl button{font-size:8px;padding:7px 3px;min-width:0}
+  #ret{width:132px;height:132px}
+  #hint{display:none}
+}
+
+/* very narrow: drop the second telemetry column's pressure by stacking pairs */
+@media(max-width:430px){
+  #nav{gap:3px}
+  .navb{font-size:7.5px;padding:7px 2px}
+  .row{flex-direction:column;align-items:flex-start;gap:0}
+  .row b{font-size:9.5px}
+  #ctrl .btns{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+}
+
+/* short viewports (landscape phones): reclaim vertical space */
+@media(max-height:620px){
+  #tick{display:none}
+  #ctrl{bottom:10px}
+}
+
+/* ---- shared disclosure caret for foldable panels ----
+   Selector must be `#panel button.fold` (111) so it outranks the generic
+   `#ctrl button` rule (101) in the mobile query, which otherwise re-applies
+   padding and squashes the caret into a non-square box. */
+#ctrl button.fold, #tel button.fold{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  width:20px;height:20px;min-width:0;padding:0;margin-right:8px;
+  pointer-events:auto;              /* #tel itself inherits none from #hud */
+  color:var(--cy);background:rgba(79,240,255,.07);
+  border:1px solid rgba(79,240,255,.30);
+  clip-path:polygon(0 4px,4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%);
+  transition:transform .18s ease, background .16s, box-shadow .16s;
+}
+#ctrl button.fold:hover, #tel button.fold:hover{
+  background:rgba(79,240,255,.18);box-shadow:0 0 12px rgba(79,240,255,.32);color:#eafcff}
+.fold svg{display:block}
+#ctrl.collapsed button.fold, #tel.collapsed button.fold{transform:rotate(-90deg)}
+
+#ctrl.collapsed .ctl{display:none}
+#ctrl.collapsed .btns{margin-top:0}
+
+#tel .hd{display:flex;align-items:center;margin-bottom:7px}
+#tel .hd .lbl{margin-right:auto}
+#tel.collapsed .rows{display:none}
+#tel.collapsed .hd{margin-bottom:0}

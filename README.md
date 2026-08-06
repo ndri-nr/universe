@@ -1,6 +1,6 @@
 # Singularity Observatory
 
-Raymarched WebGL2 visualizer — Schwarzschild black hole (Sgr A*), the Milky Way, and the Solar System — no libraries, single HTML file.
+Raymarched WebGL2 visualizer — Schwarzschild black hole (Sgr A*), the Milky Way, and the Solar System — no libraries, no build step, ES modules.
 
 **Live:** https://ndri-nr.github.io/universe/
 
@@ -13,8 +13,8 @@ Raymarched WebGL2 visualizer — Schwarzschild black hole (Sgr A*), the Milky Wa
 
 ## Run locally
 
-Just open `index.html` in a WebGL2-capable browser, or:
+Must be served over http — ES modules are blocked by CORS on `file://`, so double-clicking `index.html` won't work:
 
 ```bash
-python -m http.server 8000
+python -m http.server 8000   # then open http://localhost:8000
 ```
