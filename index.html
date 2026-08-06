@@ -975,6 +975,48 @@ vec3 surface(int id, vec3 n){
   return mix(c, vec3(0.08,0.16,0.44), exp(-dot(vec2(dx,dy),vec2(dx,dy))*9.0)*0.8);
 }
 
+/* ---- major moons ----
+   Not every moon (Jupiter alone has 95) — one representative set per planet,
+   orbiting as small spheres the same way planets orbit the Sun. Sizes and
+   orbit radii are stylized for visibility (real ratios would be sub-pixel),
+   same spirit as the Sun's exaggerated barycentre wobble elsewhere in this
+   file. ids run 9..19, continuing on from the Sun(8)/planets(0-7) scheme. */
+const int   MOON_N = 11;
+const int   MOON_PARENT[11] = int[11](2, 3,3, 4,4,4,4, 5, 6,6, 7);
+const float MOON_RAD[11]    = float[11](0.11, 0.05,0.045, 0.14,0.12,0.16,0.15, 0.17, 0.10,0.09, 0.13);
+const float MOON_ORB[11]    = float[11](0.62, 0.55,0.72, 1.35,1.75,2.55,3.90, 2.10, 1.55,1.95, 1.35);
+const float MOON_PH0[11]    = float[11](0.4, 1.9,4.2, 0.6,2.7,4.5,1.2, 3.1, 0.9,3.8, 2.2);
+/* Triton runs retrograde (negative) at a steep ~157° tilt to Neptune — the
+   one moon in this list large enough to be a real orbital oddity worth
+   modelling rather than just decorating. */
+const float MOON_SPEED[11]  = float[11](3.2, 4.6,3.0, 5.4,4.1,2.6,1.7, 2.2, 2.9,2.3, -2.0);
+const float MOON_INC[11]    = float[11](0.10,0.05,0.30, 0.03,0.02,0.08,0.12, 0.35, 0.28,0.14, 2.74);
+
+vec3 moonPos(int j){
+  vec3  pc  = planetPos(MOON_PARENT[j]);
+  float ang = MOON_PH0[j] + uTime * MOON_SPEED[j] * uOrbit;
+  float inc = MOON_INC[j];
+  return pc + MOON_ORB[j] * vec3(cos(ang), sin(ang)*sin(inc), sin(ang)*cos(inc));
+}
+vec3 moonTint(int id){
+  if(id==9)  return vec3(0.58,0.56,0.53);   // Moon
+  if(id==10) return vec3(0.36,0.34,0.31);   // Phobos
+  if(id==11) return vec3(0.42,0.39,0.36);   // Deimos
+  if(id==12) return vec3(0.92,0.78,0.36);   // Io: sulfur
+  if(id==13) return vec3(0.86,0.83,0.74);   // Europa: ice
+  if(id==14) return vec3(0.56,0.51,0.46);   // Ganymede
+  if(id==15) return vec3(0.44,0.39,0.35);   // Callisto
+  if(id==16) return vec3(0.82,0.62,0.32);   // Titan: hazy orange
+  if(id==17) return vec3(0.64,0.62,0.60);   // Titania
+  if(id==18) return vec3(0.60,0.56,0.52);   // Oberon
+  return       vec3(0.78,0.74,0.80);        // Triton: pale, frost-blue
+}
+vec3 moonSurface(vec3 n, int id){
+  float c = fbm(n*11.0 + float(id)*17.3);
+  vec3  base = moonTint(id);
+  return mix(base*0.75, base*1.15, c);
+}
+
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
   vec3 rd = normalize(uCamMat * vec3(uv, -1.45));
@@ -994,6 +1036,11 @@ void main(){
     float t = iSphere(ro, rd, c, RAD[i]);
     if(t > 0.0 && t < tB){ tB = t; id = i; ce = c; ra = RAD[i]; }
   }
+  for(int j=0;j<MOON_N;j++){
+    vec3 c = moonPos(j);
+    float t = iSphere(ro, rd, c, MOON_RAD[j]);
+    if(t > 0.0 && t < tB){ tB = t; id = 9+j; ce = c; ra = MOON_RAD[j]; }
+  }
 
   vec3 col;
   if(id == 8){
@@ -1009,7 +1056,7 @@ void main(){
     vec3 L = normalize(uSunPos - p);              // light from the displaced Sun
     float dif = max(dot(n, L), 0.0);
     float att = 1.0 / (1.0 + 0.011*length(p - uSunPos));   // gentler than inverse-square
-    vec3 base = surface(id, n);
+    vec3 base = (id < 9) ? surface(id, n) : moonSurface(n, id);
     /* fine mottling: invisible at system scale, gives the surface texture once
        you zoom in on a single body. Only costs anything on pixels that hit. */
     base *= 0.88 + 0.26*fbm(n*26.0) + 0.10*vnoise(n*70.0);
