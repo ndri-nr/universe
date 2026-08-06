@@ -42,6 +42,13 @@ permissions:
 # was briefly true, to stop a run wedged by the two-deployer race from blocking
 # everything behind it; with a single deployer there is nothing to wedge it, and
 # killing a real production deploy midway is the worse trade.
+#
+# What counts as "deployed" here is the health check at the end of the job, not
+# actions/deploy-pages' verdict. See the comment on that step: the Pages API's
+# own deployment record has repeatedly sat at deployment_queued /
+# deployment_in_progress and never reached `succeed`, while the site itself was
+# serving the new content fine. A green run should mean the site is live, so that
+# is what the job actually tests.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -51,45 +58,57 @@ jobs:
     runs-on: ubuntu-latest
     # must exceed both deploy attempts below (15 min each), or the job is killed
     # before the action gets to report anything useful
-    timeout-minutes: 35
+    # 8 min for deploy-pages, then up to 10 for the health check
+    timeout-minutes: 25
     environment:
       name: github-pages
-      # fall through to the retry's output, or the URL is blank whenever the
-      # first attempt was the one that lost the race
-      url: ${{ steps.deployment.outputs.page_url || steps.retry.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       # current majors as of this commit. The last deployment of this repo that
       # actually succeeded ran deploy-pages@v5, so do not pin these back to v4/v3
       # without a reason — v4 was a major behind and is the one that kept aborting.
       - uses: actions/configure-pages@v6
+
+      # Stamp the commit into the artifact so the deploy can be verified against
+      # the live site rather than against Pages' own bookkeeping. Not committed to
+      # the repo — it only exists inside the uploaded artifact.
+      - run: echo "${GITHUB_SHA}" > _commit.txt
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: .
+
+      # continue-on-error because this step's verdict is not the one that matters;
+      # the health check below is. deploy-pages waits for the Pages API to report
+      # `succeed` and treats anything else as unfinished, and this repo has
+      # repeatedly seen a deployment sit at `deployment_queued` or
+      # `deployment_in_progress` until the action gives up while the site was
+      # already serving the new content perfectly well. 8 min is enough to catch
+      # a genuinely fast deploy; past that the health check decides.
       - id: deployment
         continue-on-error: true
         uses: actions/deploy-pages@v5
         with:
-          # 15 min. This was briefly set to 45 on the theory that the queue was
-          # merely slow; it is not. deploy-pages polls the deployment it created,
-          # and while two deployers race for one Pages slot the loser's
-          # deployment is never promoted — so waiting longer cannot help, it just
-          # parks a runner. 15 min is well clear of a genuine queue wait while
-          # letting a superseded run give up promptly.
-          timeout: 900000
+          timeout: 480000
           error_count: 20
-          # poll every 15s rather than 5s, to keep the log readable
           reporting_interval: 15000
 
-      # One retry. Actions has no native step retry, hence continue-on-error on
-      # the attempt above plus this conditional second go. The artifact is still
-      # attached to this run, so it does not need re-uploading. Worth having
-      # because the observed error is literally "Deployment failed, try again
-      # later" — a queued deployment that lost a race, not a broken build.
-      - id: retry
-        if: steps.deployment.outcome == 'failure'
-        uses: actions/deploy-pages@v5
-        with:
-          timeout: 900000
-          error_count: 20
-          reporting_interval: 15000
+      # The actual success condition: the live site serves THIS commit. That is
+      # what "deployed" means for a static site, and unlike the deployment record
+      # it cannot sit in a state that never resolves.
+      - name: Verify the live site serves this commit
+        run: |
+          url="${{ steps.deployment.outputs.page_url }}"
+          url="${url:-https://ndri-nr.github.io/universe/}"
+          echo "checking ${url}_commit.txt for ${GITHUB_SHA}"
+          for i in $(seq 1 40); do
+            got=$(curl -fsS --max-time 20 "${url}_commit.txt" 2>/dev/null | tr -d "[:space:]" || true)
+            if [ "$got" = "$GITHUB_SHA" ]; then
+              echo "live after ~$((i*15))s"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::site never served ${GITHUB_SHA} (last saw \"${got:-nothing}\")"
+          exit 1

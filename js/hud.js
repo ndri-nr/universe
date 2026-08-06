@@ -244,6 +244,11 @@ function hudExo(t, r){
   $('xp-h').textContent = 'e · f · g';
   $('xp-y').textContent = (XP_FACTS[0].P / Math.max(S.xpOrb, 0.05) / XP_DAY_RATE).toFixed(2) + ' s / 1.51 d';
   $('xp-d').textContent = 'g · ' + (XP_FACTS[5].rk**2*100).toFixed(2) + ' %';
+  /* the compactness is the headline fact about this system and it is easy to miss
+     from the picture alone: every orbit fits inside Mercury's, six times over.
+     The dashed reference ring in FS_XP is the same statement drawn. */
+  $('xp-s').textContent = XP_FACTS[6].au.toFixed(3) + ' AU · 1/'
+                        + (0.387/XP_FACTS[6].au).toFixed(1) + ' of MERCURY';
 
   const link = $('t-l');
   if(r < 16){ link.textContent = 'INSIDE ORBITS'; link.className = 'warn'; }

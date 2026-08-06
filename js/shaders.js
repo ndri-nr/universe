@@ -49,6 +49,16 @@ float fbm(vec3 p){
   for(int i=0;i<5;i++){ s += a*vnoise(p); p = p*2.03 + vec3(1.7,9.2,3.4); a *= 0.5; }
   return s;
 }
+/* 3-octave fbm. Range is 0..0.875, NOT fbm()'s 0..0.969 — thresholds tuned
+   against one are wrong for the other. Worth having wherever noise is sampled
+   several times per march step: the two tail octaves usually land at or below the
+   step size, so they cost 2/5 of the budget to produce detail the per-sample
+   dither already supplies. Used by FS_NEBULA and FS_XP. */
+float fbm3(vec3 p){
+  float s = 0.0, a = 0.5;
+  for(int i=0;i<3;i++){ s += a*vnoise(p); p = p*2.03 + vec3(1.7,9.2,3.4); a *= 0.5; }
+  return s;
+}
 
 /* ---- procedural deep field ---- */
 float starLayer(vec3 d, float scale, float thr, float sz){
@@ -1446,17 +1456,6 @@ void main(){
 export const FS_NEBULA = GLSL_HEAD + `
 uniform float uDensity, uProto, uJet;
 
-/* 3 octaves instead of the shared fbm()'s 5. This scene samples noise three
-   times per march step across a screen the cloud completely fills, so it is
-   the one place where the two tail octaves matter: they land at or below the
-   march step size, i.e. they cost 2/5 of the scene's frame budget to produce
-   detail the per-sample dither already supplies. Range is 0..0.875, not
-   0..0.969 — thresholds below are tuned against that. */
-float fbm3(vec3 p){
-  float s = 0.0, a = 0.5;
-  for(int i=0;i<3;i++){ s += a*vnoise(p); p = p*2.03 + vec3(1.7,9.2,3.4); a *= 0.5; }
-  return s;
-}
 
 /* 18 pc. Was 26 (cavity too small a fraction of frame, all red mush), then 13
    (right proportions but the cloud read as a ball). Now the envelope inside this
@@ -1675,9 +1674,14 @@ const float HZ_OUT = 13.35;
    TRAPPIST-1h's 31 s — the near-resonant chain stays visible as a rhythm */
 const float DAY_RATE = 0.6;
 
+/* Tiny mutual inclinations, ~0.1-0.3 deg in reality. Without them all seven sit
+   in one exact plane, and at the near-edge-on angle this scene is framed at they
+   overlap into a single line. */
+const float P_INC[7] = float[7](0.020, -0.014, 0.026, -0.008, 0.017, -0.022, 0.011);
+
 vec3 planetPos(int i){
   float ang = uTime * uOrb * DAY_RATE * 6.28318530718 / P_DAY[i];
-  return vec3(cos(ang), 0.0, sin(ang)) * P_ORB[i];
+  return vec3(cos(ang), sin(ang)*P_INC[i], sin(ang)) * P_ORB[i];
 }
 vec3 planetCol(int i){
   /* b/c are scorched rock, d/e are the temperate pair, f/g/h are likely
@@ -1710,14 +1714,21 @@ void main(){
   vec3  col   = vec3(0.0);
   bool  hit   = false;
 
-  /* the star. 2566 K is deep orange-red; limb darkening is the strong one an
-     M dwarf actually shows, not the Sun's gentle gradient */
+  /* The star. 2566 K is deep orange-red; limb darkening is the strong one an
+     M dwarf actually shows, not the Sun's gentle gradient. Granulation and a
+     cooler limb on top, because a flat shaded ball looked like a billiard ball
+     and this is the one object in frame big enough to carry surface detail. */
   float ts = hitSphere(uCam, rd, vec3(0.0), R_STAR);
   if(ts > 0.0){
     vec3  n  = normalize(uCam + rd*ts);
     float mu = max(dot(n, -rd), 0.0);
-    float ld = 0.35 + 0.65*pow(mu, 0.65);
-    col = vec3(1.35,0.46,0.14) * ld * uLum * 2.4;
+    float ld = 0.30 + 0.70*pow(mu, 0.62);
+    /* convective granulation, drifting slowly with rotation */
+    float gran = fbm3(n*7.5 + vec3(0.0, uTime*0.05, 0.0));
+    /* cooler mottling and a redder limb: hot cores of granules, cool lanes */
+    vec3  hot  = vec3(1.42,0.56,0.19);
+    vec3  cool = vec3(0.92,0.24,0.07);
+    col = mix(cool, hot, smoothstep(0.30, 0.62, gran)) * ld * uLum * 2.4;
     bestT = ts; hit = true;
   }
 
@@ -1733,7 +1744,14 @@ void main(){
       /* inverse-square dimming with distance from the star, plus a thin
          terminator rim so the night side is not flat black */
       float ill = uLum * 110.0 / dot(p, p);
-      col   = planetCol(i) * (lam*ill + 0.035)
+      /* surface mottling, so each world reads as a body rather than a flat dot.
+         Seeded per planet so no two share a pattern. These are illustrative —
+         no surface has been imaged and no atmosphere detected on any of them. */
+      float mot = fbm3(n*4.5 + float(i)*13.7);
+      vec3  base = planetCol(i) * (0.72 + 0.55*mot);
+      /* a soft terminator: real phase curves do not switch to black at 90 deg */
+      float phase = smoothstep(-0.12, 0.45, dot(n, l));
+      col   = base * (lam*ill*phase + 0.030)
             + vec3(1.0,0.45,0.20) * pow(1.0 - max(dot(n,-rd),0.0), 4.0) * lam * 0.25;
       bestT = tp; hit = true;
     }
@@ -1761,6 +1779,16 @@ void main(){
     float ring = 0.0;
     for(int i=0;i<NP;i++) ring += smoothstep(0.055, 0.0, abs(rq - P_ORB[i]));
     col += vec3(0.30,0.46,0.62) * min(ring, 1.0) * uRings * 0.42;
+
+    /* Mercury's orbit, to the same a^0.62 compression, as a scale reference:
+       0.387 AU lands at 34.6 display units against TRAPPIST-1h's 15.9. This is
+       the fact the system is famous for — all seven planets would fit inside
+       Mercury's orbit with room to spare — and it is invisible unless something
+       in frame stands for it. Dashed, and dimmer than the real orbits, so it
+       does not read as another planet's path. */
+    float dash = step(0.35, fract(atan(q.z, q.x) * 6.5));
+    col += vec3(0.52,0.50,0.44) * smoothstep(0.10, 0.0, abs(rq - 34.6))
+         * dash * uRings * 0.30;
   }
 
   /* stellar glow, added last so it also washes over anything in front of it —

@@ -106,8 +106,14 @@ export const SCENES = {
         +'RADIATION PRESSURE SCULPTING PILLARS ◆ CLASSIFIED: DIFFUSE EMISSION NEBULA ◆'
   },
   xp: {
-    /* outermost orbit (h) sits at 15.9 display units; this frames all seven */
-    dist: 46.0, pitch: 0.34, min: 6.0, max: 120,
+    /* Near edge-on (pitch 0.07, ~4 deg) rather than the 0.34 this started at.
+       The scene's whole subject is the transit method, and the light curve under
+       the telemetry is plotting transits — but at 0.34 the system is tilted far
+       enough toward face-on that no planet ever crosses the star's disc from the
+       camera's viewpoint, so the premise was invisible. Flat on gets it back.
+       Outermost orbit (h) is 15.9 display units; 46 frames all seven, and the
+       Mercury-orbit scale ring at 34.6 comes in as you pull back. */
+    dist: 46.0, pitch: 0.07, min: 6.0, max: 120,
     lbl: 'transit photometry // node-07',
     h1:  'TRAPPIST-1',
     sub: 'M8V ULTRACOOL DWARF &middot; 7 PLANETS &middot; 3 IN HABITABLE ZONE',
