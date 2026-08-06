@@ -1259,7 +1259,23 @@ void main(){
 export const FS_NEBULA = GLSL_HEAD + `
 uniform float uDensity, uProto, uJet;
 
-const float R_HALO = 26.0;
+/* 3 octaves instead of the shared fbm()'s 5. This scene samples noise three
+   times per march step across a screen the cloud completely fills, so it is
+   the one place where the two tail octaves matter: they land at or below the
+   march step size, i.e. they cost 2/5 of the scene's frame budget to produce
+   detail the per-sample dither already supplies. Range is 0..0.875, not
+   0..0.969 — thresholds below are tuned against that. */
+float fbm3(vec3 p){
+  float s = 0.0, a = 0.5;
+  for(int i=0;i<3;i++){ s += a*vnoise(p); p = p*2.03 + vec3(1.7,9.2,3.4); a *= 0.5; }
+  return s;
+}
+
+/* 13 pc, not the 26 it started at: the protostars sit ~4 pc out, so on a 26 pc
+   cloud their ionized cavity was a few percent of the frame and the whole
+   thing read as undifferentiated red mush. Halving the halo makes the cavity a
+   third of the cloud, which is roughly the M16 proportion. */
+const float R_HALO = 13.0;
 const int   PROTO_N = 5;
 const vec3  PROTO_POS[5] = vec3[5](
   vec3( 3.2, 1.1,-2.0),
@@ -1280,51 +1296,89 @@ vec3 protoJet(vec3 p, vec3 starPos, float rad, float axisSeed){
   float pr = length(perp);
   float rj = rad*0.5 + abs(along)*0.06;
   if(pr > rj*1.8) return vec3(0.0);
-  float lon  = smoothstep(rad*0.6, rad*2.0, abs(along)) * exp(-abs(along)*0.10);
+  /* ~1.2 pc e-folding, not the 10 pc it started at: on a 13 pc cloud a jet that
+     decays over 10 pc spans the whole frame and reads as a searchlight through
+     the nebula rather than an outflow belonging to one star */
+  float lon  = smoothstep(rad*0.6, rad*2.0, abs(along)) * exp(-abs(along)*0.85);
   float turb = 0.5 + 0.6*vnoise(perp*3.0 + vec3(0.0, 0.0, along*0.4 - uTime*0.6));
   float dens = exp(-pr*pr/(rj*rj)*2.0) * lon * turb;
-  return vec3(0.55,0.70,1.4) * dens;
+  return vec3(0.55,0.70,1.4) * dens * 0.40;
 }
 
-/* emission at p; also returns the local absorption coefficient */
+/* emission at p; also returns the local absorption coefficient.
+   Emission/absorption ratio is the thing to be careful with here: a sightline
+   through the cloud is ~50 pc long, so it goes optically thick and saturates
+   at emit/ab. Keep that ratio below ~1 (same calibration as galaxy(): 0.42
+   emit vs 0.63 ab) or every pixel saturates to the same white and the whole
+   nebula reads as one featureless blob.
+
+   Colour is driven by ionization, not by noise: M16-style nurseries are deep
+   H-alpha red through the bulk of the cloud and turn teal (OIII) only inside
+   the cavity the hot cluster has blown out. So the cluster's ionizing flux
+   does three things at once — tints the gas, brightens it per unit density,
+   and evacuates it — which is what makes the core a see-through teal bubble
+   instead of the brightest, densest part of the cloud. */
 vec3 nebulaEmit(vec3 p, out float ab){
   ab = 0.0;
-  float r = length(p);
-  if(r > R_HALO) return vec3(0.0);
-
-  /* billowy turbulent structure at three scales */
-  float n1 = fbm(p*0.16 + vec3(0.0, uTime*0.006, 0.0));
-  float n2 = fbm(p*0.42 + 11.0);
-  float n3 = fbm(p*1.10 + 23.0 - vec3(0.0, uTime*0.010, 0.0));
-  float shape = smoothstep(0.30, 0.95, n1) * (0.4 + 0.9*n2);
-  float dens  = shape * (0.35 + 0.85*pow(n3,1.4)) * smoothstep(R_HALO, R_HALO*0.55, r);
-  dens *= uDensity;
-
-  /* two emission populations blended by a slower, larger-scale noise so it
-     reads as broad colour regions rather than static per-voxel noise */
-  float colorNoise = fbm(p*0.09 + 41.0 + vec3(0.0, uTime*0.004, 0.0));
-  vec3  haCol   = vec3(1.15,0.28,0.42);   // H-alpha: dense, ionized hydrogen
-  vec3  oiiiCol = vec3(0.25,0.85,0.95);   // OIII: diffuse, hot young stars
-  vec3  baseCol = mix(oiiiCol, haCol, smoothstep(0.35,0.65,colorNoise));
-
-  /* dust lanes: dense knots that absorb rather than emit, carving dark
-     silhouettes through the bright cloud — Pillars-of-Creation style */
-  float dust = pow(max(n3-0.55, 0.0) * 2.2, 2.0) * shape;
-
-  vec3 col = baseCol * dens * (1.0 - dust*0.7) * 1.5;
-  ab = dens*0.50 + dust*0.85;
+  vec3 col = vec3(0.0);
 
   /* protostars: bright cores embedded in the cloud. ab includes their core
      too — same lesson as the pulsar scene's surface fix, a bright emitter
-     needs absorption of its own or the march just re-adds it every step */
+     needs absorption of its own or the march just re-adds it every step.
+     Done before the gas early-out so a star in a thin pocket still shows.
+     The cores alone are useless from outside: they sit ~4 pc from the centre
+     behind several optical depths of gas, so direct light arrives at a few
+     percent and the stars vanish. The ionizing flux they cast on the gas
+     around them is what actually makes a nursery read as a nursery. */
+  float ion = 0.0;
   for(int i=0;i<PROTO_N;i++){
     float d    = length(p - PROTO_POS[i]);
     float core = exp(-d*d/(PROTO_RAD[i]*PROTO_RAD[i]) * 3.0);
-    col += vec3(1.6,1.5,1.8) * core * uProto * 1.8;
+    col += vec3(1.60,1.55,1.90) * core * uProto * 8.0;
     ab  += core * 0.9;
+    ion += uProto * PROTO_RAD[i]*PROTO_RAD[i] * 22.0 / (d*d + 0.5);
   }
   col += protoJet(p, PROTO_POS[0], PROTO_RAD[0], 0.4) * uJet;
   col += protoJet(p, PROTO_POS[4], PROTO_RAD[4], 2.6) * uJet;
+
+  float r = length(p);
+  if(r > R_HALO) return col;
+
+  /* billowy turbulent structure at three scales. n1 gates the other two: the
+     hard smoothstep zeroes out a lot of the volume — that's both the frame
+     budget and the point, since the empty lanes are what let background stars
+     through and keep the cloud from reading as full-frame fog. */
+  float n1 = fbm3(p*0.13 + vec3(0.0, uTime*0.006, 0.0));
+  float shape = smoothstep(0.38, 0.68, n1);
+  if(shape < 0.004) return col;
+  /* single octave for the mid-scale modulator: it only has to break the large
+     billows into lobes, and an fbm here was 5 more hash calls for nothing */
+  float n2 = vnoise(p*0.34 + 11.0);
+  float n3 = fbm3(p*0.95 + 23.0 - vec3(0.0, uTime*0.010, 0.0));
+  shape *= (0.30 + 0.85*n2);
+  float dens = shape * (0.30 + 0.90*pow(n3,1.6)) * smoothstep(R_HALO, R_HALO*0.62, r);
+  /* radiation pressure has evacuated the cavity around the cluster */
+  dens *= uDensity / (1.0 + ion*1.6);
+
+  /* real H II regions have a sharp ionization front, and so must this one: a
+     smooth 1/r^2 rolloff tints the entire cloud a few percent teal, which
+     desaturates the H-alpha red into pink everywhere instead of leaving it
+     deep red outside a well-defined cavity */
+  float ionz = smoothstep(0.30, 1.10, ion); // 0 = neutral cloud, 1 = H II cavity
+  vec3  haCol   = vec3(1.30,0.16,0.30);    // H-alpha: neutral bulk of the cloud
+  vec3  oiiiCol = vec3(0.16,0.54,0.78);    // OIII: ionized gas near the cluster
+  vec3  baseCol = mix(haCol, oiiiCol, ionz);
+
+  /* dust: hard-edged opaque knots that absorb rather than emit, carving the
+     pillar silhouettes. Threshold is a smoothstep on the fine noise so the
+     edges stay sharp, and ab is dust-dominated so they read as truly black
+     against the glow instead of as grey haze. */
+  float dust = smoothstep(0.40, 0.56, n3) * shape;
+
+  /* the ionized gas is brighter per unit density, but only ~2x: crank it and
+     all three channels clip and the cavity turns white instead of teal */
+  col += baseCol * dens * (0.55 + 1.05*ionz) * (1.0 - dust*0.92);
+  ab  += dens*1.05 + dust*4.0;
 
   return col;
 }
@@ -1343,12 +1397,18 @@ void main(){
     float sq = sqrt(disc);
     float t0 = max(-b - sq, 0.0);
     float t1 = -b + sq;
-    int   ns = min(uSteps, 260);
+    /* 72 steps over a 26 pc chord is dt ~0.36 pc, about a third of the finest
+       noise feature — the per-sample dither covers the rest. This scene fills
+       the whole screen with gas (unlike the galaxy's thin disk, where most rays
+       hit nothing), so step count is the entire frame budget here. The early
+       break is at 0.02 rather than the usual 0.003 for the same reason: dust
+       drives trans down fast and the last 2% is invisible. */
+    int   ns = min(uSteps, 72);
     float dt = (t1 - t0) / float(ns);
     float jit = h13(vec3(gl_FragCoord.xy, floor(uTime*24.0)));
     float t = t0 + dt*jit;
     for(int i=0;i<MAXS;i++){
-      if(i >= ns || trans < 0.003) break;
+      if(i >= ns || trans < 0.02) break;
       float ab;
       float d2 = h13(vec3(gl_FragCoord.xy, float(i) + jit*13.0)) - 0.5;
       vec3 em = nebulaEmit(uCam + rd*(t + dt*d2*0.9), ab);

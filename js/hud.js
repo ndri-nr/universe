@@ -142,7 +142,8 @@ function hudPulsar(t, r){
    focusable), so unlike hudSolar/hudPulsar these numbers describe the whole
    cloud rather than a tracked body — NEAREST PROTOSTAR uses the closest of
    the 5 fixed PROTO_POS entries baked into FS_NEBULA (nearest is index 0,
-   |pos| ≈ 3.93 pc from the cloud centre). --- */
+   |pos| ≈ 3.93 pc from the cloud centre), so its range is the camera radius
+   minus that — good enough while the camera always looks at the centre. --- */
 function hudNebula(t, r){
   $('nb-d').textContent = (0.55*S.nbDensity + 0.10*Math.sin(t*0.4)).toFixed(2);
   const active = S.nbProto > 0.03 ? 5 : 0;
@@ -150,10 +151,10 @@ function hudNebula(t, r){
   const je = $('nb-j');
   if(S.nbJet < 0.02){ je.textContent = 'DORMANT'; je.className = ''; }
   else { je.textContent = 'BIPOLAR ACTIVE'; je.className = 'warn'; }
-  $('nb-n').textContent = (3.93 + 0.4*Math.sin(t*0.25)).toFixed(2) + ' pc';
+  $('nb-n').textContent = (Math.abs(r - 3.93) + 0.4*Math.sin(t*0.25)).toFixed(2) + ' pc';
 
   const link = $('t-l');
-  if(r < 6){ link.textContent = 'IN CLOUD CORE'; link.className = 'warn'; }
+  if(r < 13){ link.textContent = 'IN CLOUD CORE'; link.className = 'warn'; }
   else { link.textContent = 'STABLE'; link.className = ''; }
 
   return [

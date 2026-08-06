@@ -78,10 +78,12 @@ export const SCENES = {
         +'◆ DISPERSION MEASURE 116.5 pc·cm&#8315;&sup3; ◆ CLASSIFIED: ROTATION-POWERED PULSAR ◆'
   },
   nb: {
-    dist: 20.0, pitch: 0.30, min: 4.0, max: 40,
+    /* dist must stay outside R_HALO (13 pc in FS_NEBULA) or the camera starts
+       inside the gas and the cloud fills the frame as a flat wall */
+    dist: 30.0, pitch: 0.30, min: 8.0, max: 70,
     lbl: 'infrared survey // node-07',
     h1:  'NGC 6611-B',
-    sub: 'H II EMISSION NEBULA &middot; 5 PROTOSTARS &middot; R &asymp; 26 pc',
+    sub: 'H II EMISSION NEBULA &middot; 5 PROTOSTARS &middot; R &asymp; 13 pc',
     rlbl:'OBS RADIUS', runit:' pc', slbl:'MARCH STEPS',
     meters:['CLOUD DENSITY','PROTOSTAR LUMINOSITY','JET ACTIVITY',
             'DUST EXTINCTION','BACKGROUND NOISE'],

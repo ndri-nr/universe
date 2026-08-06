@@ -22,7 +22,7 @@ Roadmap, in working order. Check items off as shipped.
 ## 4. New scene tab
 - [x] Neutron star / pulsar — beamed lighthouse jets, magnetosphere
 - [ ] Exoplanet system — transit method visual, habitable zone band
-- [ ] Nebula / stellar nursery — protostars forming
+- [x] Nebula / stellar nursery — protostars forming
 
 ## 5. Cross-cutting / UI
 - [ ] Screenshot / share button
