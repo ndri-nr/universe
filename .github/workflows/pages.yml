@@ -56,10 +56,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # must exceed both deploy attempts below (15 min each), or the job is killed
-    # before the action gets to report anything useful
-    # 8 min for deploy-pages, then up to 10 for the health check
-    timeout-minutes: 25
+    # worst case: 5 (deploy-pages) + 15 (queued watch) + 10 (live check) = 30
+    timeout-minutes: 35
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -79,20 +77,67 @@ jobs:
         with:
           path: .
 
-      # continue-on-error because this step's verdict is not the one that matters;
-      # the health check below is. deploy-pages waits for the Pages API to report
-      # `succeed` and treats anything else as unfinished, and this repo has
-      # repeatedly seen a deployment sit at `deployment_queued` or
-      # `deployment_in_progress` until the action gives up while the site was
-      # already serving the new content perfectly well. 8 min is enough to catch
-      # a genuinely fast deploy; past that the health check decides.
+      # 5 minutes, and continue-on-error, because this step's verdict is not the
+      # one that matters — the two steps after it are. deploy-pages waits for the
+      # Pages API to report `succeed` and treats everything else as unfinished,
+      # and this repo repeatedly sees a deployment sit at `deployment_queued` or
+      # `deployment_in_progress` until the action gives up while the site is
+      # already serving the new content. 5 min catches a genuinely fast deploy;
+      # past that, waiting inside this action buys nothing.
       - id: deployment
         continue-on-error: true
         uses: actions/deploy-pages@v5
         with:
-          timeout: 480000
+          timeout: 300000
           error_count: 20
           reporting_interval: 15000
+
+      # Status-aware wait, which deploy-pages cannot do: it has one flat timeout
+      # for every state, but the two states mean different things here.
+      #   deployment_queued      — Pages has not started. Genuinely worth waiting
+      #                            out, so allow the full 15 minutes.
+      #   deployment_in_progress — Pages accepted it and is rolling out; the
+      #                            content usually lands well before the record
+      #                            flips to `succeed`, and in this repo it often
+      #                            never flips at all. Ten polls (2.5 min) is
+      #                            plenty, then hand over to the live-site check.
+      # The deployment id is just the commit SHA — that is what deploy-pages logs
+      # as "Created deployment for <sha>, ID: <sha>" — so the status URL needs no
+      # output threaded out of the step above.
+      - name: Watch the deployment record
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployment/status/${GITHUB_SHA}"
+          inprog=0; waited=0
+          for i in $(seq 1 60); do
+            st=$(curl -fsS --max-time 20 \
+                   -H "Authorization: Bearer ${GH_TOKEN}" \
+                   -H "Accept: application/vnd.github+json" "$api" 2>/dev/null \
+                 | tr -d "\n" \
+                 | sed -n 's/.*"status"[^"]*"\([^"]*\)".*/\1/p')
+            echo "status: ${st:-unreadable}"
+            case "$st" in
+              succeed)
+                echo "record reached succeed after ~$((i*15))s"; exit 0 ;;
+              deployment_in_progress)
+                inprog=$((inprog+1))
+                if [ "$inprog" -ge 10 ]; then
+                  echo "in_progress for 10 polls — not waiting further, the live-site check decides"
+                  exit 0
+                fi ;;
+              deployment_failed|deployment_content_failed|deployment_cancelled|deployment_lost)
+                echo "::error::Pages reported terminal state: $st"; exit 1 ;;
+              *)
+                # queued, or the status could not be read; both just wait
+                waited=$((waited+1))
+                if [ "$waited" -ge 60 ]; then
+                  echo "still not started after 15 min — the live-site check decides"
+                  exit 0
+                fi ;;
+            esac
+            sleep 15
+          done
 
       # The actual success condition: the live site serves THIS commit. That is
       # what "deployed" means for a static site, and unlike the deployment record
