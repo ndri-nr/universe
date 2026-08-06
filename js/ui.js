@@ -210,7 +210,7 @@ function publishState(){
   if(S.scene === 'ss' && S.focus >= 0){
     subject = ((S.focus === 8) ? SUN_FACT : FACTS[S.focus]).n + ' · SOLAR SYSTEM';
   }
-  document.title = subject + ' // SINGULARITY OBSERVATORY';
+  document.title = subject + ' | SINGULARITY OBSERVATORY';
 }
 export function applyHash(){
   const raw = (location.hash || '').replace(/^#/, '').toLowerCase();
