@@ -16,6 +16,7 @@ Roadmap, in working order. Check items off as shipped.
 - [ ] Comet with dust + ion tail, always pointing away from Sun, on a wildly eccentric orbit
 - [ ] Earth day/night terminator + city lights on the dark side
 - [ ] Clickable notable asteroids in the belt (Ceres, Vesta)
+- [ ] Make Saturn's rings more realistic
 
 ## 4. New scene tab
 - [ ] Neutron star / pulsar — beamed lighthouse jets, magnetosphere
