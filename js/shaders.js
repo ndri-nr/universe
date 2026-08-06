@@ -89,6 +89,12 @@ vec3 deepField(vec3 d){
 /* ============================ SCENE A: BLACK HOLE ============================ */
 export const FS_SCENE = GLSL_HEAD + `
 uniform float uLens, uDisk, uSpin, uDopp, uJet;
+/* companion black hole for a binary-merger view. uComp IS the companion's
+   Schwarzschild radius in the same r_s=1 units as the primary (so it's both
+   "how big is its horizon" and "how hard does it pull" — physically these
+   are the same number). uComp=0 collapses this exactly back to the single
+   black hole case: its force term and horizon test both vanish. */
+uniform float uComp, uSep;
 
 const float RS   = 1.0;          // event horizon
 const float PHOT = 1.5;          // photon sphere
@@ -187,6 +193,12 @@ void main(){
   vec3  hv  = cross(pos, dir);
   float h2  = dot(hv, hv);
 
+  /* companion's orbital position — fixed for the whole march (it barely moves
+     across one ray's integration), recomputed fresh next frame via uTime */
+  float cAng = uTime * uSpin * 0.12 + 0.7;
+  vec3  cPos = vec3(cos(cAng), 0.0, sin(cAng)) * uSep;
+  bool  binary = uComp > 0.004;
+
   vec3  col   = vec3(0.0);
   float trans = 1.0;
   float glow  = 0.0;
@@ -197,6 +209,7 @@ void main(){
     if(i >= steps) break;
     float r = length(pos);
     if(r < RS){ eaten = true; break; }
+    if(binary && length(pos - cPos) < uComp){ eaten = true; break; }
     if(r > 70.0 && dot(pos,dir) > 0.0) break;
     if(trans < 0.004) break;
 
@@ -211,13 +224,35 @@ void main(){
 
     /* photon-ring halo accumulation */
     glow += dt * 0.0080 / (abs(r - PHOT) + 0.34) / (1.0 + 0.06*r*r);
+    if(binary){
+      float rB = length(pos - cPos);
+      glow += dt * 0.0080 * uComp / (abs(rB - 1.5*uComp) + 0.34) / (1.0 + 0.06*rB*rB);
+    }
 
     /* RK2 integration of the null geodesic */
     vec3 a1 = -1.5 * h2 * pos / pow(r,5.0) * uLens;
+    if(binary){
+      /* the companion isn't at the origin, so its specific angular momentum
+         about itself is NOT conserved along the ray the way h2 is for the
+         primary — recompute it fresh at each stage from the current local
+         position/direction. Cheap (one extra cross+dot) and correct enough
+         for a visual binary-lensing effect, not a full two-body geodesic
+         solver (which has no closed form anyway). */
+      vec3  relA = pos - cPos;
+      float rA   = max(length(relA), uComp*0.85);
+      vec3  hvB  = cross(relA, dir);
+      a1 += -1.5 * uComp * dot(hvB,hvB) * relA / pow(rA,5.0) * uLens;
+    }
     vec3 pm = pos + dir*dt*0.5;
     vec3 dm = dir + a1*dt*0.5;
     float rm = max(length(pm), RS*0.85);
     vec3 a2 = -1.5 * h2 * pm / pow(rm,5.0) * uLens;
+    if(binary){
+      vec3  relB = pm - cPos;
+      float rB2  = max(length(relB), uComp*0.85);
+      vec3  hvB2 = cross(relB, dm);
+      a2 += -1.5 * uComp * dot(hvB2,hvB2) * relB / pow(rB2,5.0) * uLens;
+    }
 
     vec3 prev = pos;
     dir += a2*dt;

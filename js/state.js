@@ -11,6 +11,7 @@ export const S = {
   tYaw: 0.62, tPitch: 0.26, tDist: 23.0,
   auto: true, hud: true, quality: 2,
   disk: 1.15, lens: 1.0, spin: 1.0, dopp: 1.0, bloom: 1.05, star: 1.0, jet: 1.0,
+  comp: 0.0, sep: 8.0,
   arm: 1.0, dust: 1.0, core: 1.0, hii: 1.0, rot: 1.0,
   orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 0.0, smark: 1.0,
   scene: 'bh', scale: 0.9, steps: 300,

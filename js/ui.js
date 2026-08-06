@@ -125,6 +125,8 @@ bindSlider('s-lens','lens','v-lens');
 bindSlider('s-spin','spin','v-spin');
 bindSlider('s-jet','jet','v-jet');
 bindSlider('s-dopp','dopp','v-dopp');
+bindSlider('s-comp','comp','v-comp');
+bindSlider('s-sep','sep','v-sep');
 bindSlider('s-bloom','bloom','v-bloom');
 bindSlider('s-star','star','v-star');
 bindSlider('s-arm','arm','v-arm');
@@ -257,7 +259,7 @@ function reset(){
   const sc = SCENES[S.scene];
   S.tYaw=0.62; S.tPitch=sc.pitch; S.tDist=sceneDist(S.scene); S.zoomed=false; S.auto=true; syncAuto();
   if(S.scene === 'ss') setFocus(-1);
-  const d={ 's-disk':1.15,'s-lens':1,'s-spin':1,'s-jet':1,'s-dopp':1,'s-bloom':1.05,'s-star':1,
+  const d={ 's-disk':1.15,'s-lens':1,'s-spin':1,'s-jet':1,'s-dopp':1,'s-comp':0,'s-sep':8,'s-bloom':1.05,'s-star':1,
             's-arm':1,'s-dust':1,'s-core':1,'s-hii':1,'s-rot':1,
             's-orbit':1,'s-sunl':1,'s-path':1,'s-detail':1,'s-belt':1,
             's-bary':0,'s-smark':1 };

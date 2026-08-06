@@ -125,6 +125,10 @@ function hudHole(t, r){
   if(S.jet < 0.02){ je.textContent = 'DORMANT'; je.className = ''; }
   else { je.textContent = (S.pitch >= 0 ? 'NORTH +y' : 'SOUTH −y'); je.className = 'warn'; }
 
+  const cm = $('t-cm');
+  if(S.comp < 0.02){ cm.textContent = 'NONE'; cm.className = ''; }
+  else { cm.textContent = S.comp.toFixed(2) + ' M_prim @ ' + S.sep.toFixed(1) + ' r_s'; cm.className = 'warn'; }
+
   const link = $('t-l');
   if(r < 6){ link.textContent = 'TIDAL STRESS'; link.className = 'crit'; }
   else if(r < 10){ link.textContent = 'DEGRADED'; link.className = 'warn'; }

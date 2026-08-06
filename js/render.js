@@ -150,6 +150,8 @@ export function frame(now){
     gl.uniform1f(PS.u.uSpin, S.spin);
     gl.uniform1f(PS.u.uDopp, S.dopp);
     gl.uniform1f(PS.u.uJet,  S.jet);
+    gl.uniform1f(PS.u.uComp, S.comp);
+    gl.uniform1f(PS.u.uSep,  S.sep);
   }
   drawFull();
 
