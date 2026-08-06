@@ -754,6 +754,57 @@ vec3 charonPos(vec3 bary){
   return bary - off * vec3(cos(ang), 0.12*sin(ang*0.7), sin(ang));
 }
 
+/* ---- comet ----
+   Wildly eccentric (e=0.92): perihelion ~1.0 unit (deep in the inner
+   system), aphelion ~24 (out past Uranus). A comet's orbit legitimately
+   crosses several planets' paths in reality — that's expected, not the kind
+   of "always collapses" bug the tight moon/inner-planet packing was; no
+   dedicated neighbour-clearance sweep needed here. */
+const float COMET_AU=8.0, COMET_ECC=0.92, COMET_INC=0.35, COMET_NODE=0.5, COMET_PH0=0.0;
+const float COMET_RAD = 0.045;
+
+vec3 cometPos(){
+  float orbRc = 4.6 * pow(COMET_AU, 0.48);
+  float m  = uTime * pow(COMET_AU, -1.5) * ORB_RATE * uOrbit;
+  float nu = COMET_PH0 + m;
+  float R  = orbRc * (1.0 - COMET_ECC*COMET_ECC) / (1.0 + COMET_ECC*cos(m));
+  float cn = cos(COMET_NODE), sn = sin(COMET_NODE);
+  float ci = cos(COMET_INC),  si = sin(COMET_INC);
+  vec3  u  = vec3(cn, 0.0, sn);
+  vec3  w  = vec3(-sn*ci, si, cn*ci);
+  return R * (cos(nu)*u + sin(nu)*w);
+}
+
+/* The tail always points directly away from the Sun (solar wind/radiation
+   pressure — real ion tails do exactly this, straightened out; dust tails
+   curve slightly behind the orbital path, simplified to straight here) and
+   scales with solar heating: short/faint far out, long/bright near
+   perihelion. Rendered as a chain of point-glows — this scene has no march
+   loop to volumetrically integrate a real streak, so it reuses the same
+   "point-glow via perpendicular ray distance" trick as the barycentre
+   marker below, gated by tB so a planet in front still occludes it. */
+void addCometTail(vec3 ro, vec3 rd, float tB, vec3 nucleus, vec3 sunPos, inout vec3 col){
+  vec3  awaySun = normalize(nucleus - sunPos);
+  float solarD  = length(nucleus - sunPos);
+  float heat    = clamp(2.2/max(solarD,0.3), 0.0, 1.0);
+  float tailLen = mix(0.35, 5.5, heat);
+  float bright  = mix(0.10, 1.35, heat);
+  const int N = 10;
+  for(int i=1;i<=N;i++){
+    float f = float(i)/float(N);            // 0 near nucleus .. 1 at tail end
+    vec3  Q = nucleus + awaySun*tailLen*f;
+    vec3  oc = Q - ro;
+    float t  = dot(oc, rd);
+    if(t < 0.0 || t > tB) continue;
+    vec3  closest = ro + rd*t;
+    float perp = length(Q - closest);
+    float fall = bright * (1.0 - f) * (1.0 - f);
+    /* ion (inner, blue-white) fading into dust (outer, warm) along the tail */
+    vec3  tint = mix(vec3(0.55,0.75,1.20), vec3(0.95,0.80,0.55), f);
+    col += tint * fall / (perp*perp*900.0 + 0.02);
+  }
+}
+
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
   vec3 rd = normalize(uCamMat * vec3(uv, -1.45));
@@ -784,6 +835,9 @@ void main(){
   float tCharon = iSphere(ro, rd, charonP, CHARON_RAD);
   if(tPluto  > 0.0 && tPluto  < tB){ tB = tPluto;  id = 20; ce = plutoP;  ra = PLUTO_RAD; }
   if(tCharon > 0.0 && tCharon < tB){ tB = tCharon; id = 21; ce = charonP; ra = CHARON_RAD; }
+  vec3  cometP = cometPos();
+  float tComet = iSphere(ro, rd, cometP, COMET_RAD);
+  if(tComet  > 0.0 && tComet  < tB){ tB = tComet;  id = 22; ce = cometP;  ra = COMET_RAD; }
 
   vec3 col;
   if(id == 8){
@@ -799,7 +853,8 @@ void main(){
     vec3 L = normalize(uSunPos - p);              // light from the displaced Sun
     float dif = max(dot(n, L), 0.0);
     float att = 1.0 / (1.0 + 0.011*length(p - uSunPos));   // gentler than inverse-square
-    vec3 base = (id < 9) ? surface(id, n) : (id <= 19) ? moonSurface(n, id) : plutoCharonSurface(n, id);
+    vec3 base = (id < 9) ? surface(id, n) : (id <= 19) ? moonSurface(n, id)
+              : (id <= 21) ? plutoCharonSurface(n, id) : vec3(0.42,0.44,0.48);  // 22: comet nucleus, dirty ice
     /* fine mottling: invisible at system scale, gives the surface texture once
        you zoom in on a single body. Only costs anything on pixels that hit. */
     base *= 0.88 + 0.26*fbm(n*26.0) + 0.10*vnoise(n*70.0);
@@ -934,6 +989,8 @@ void main(){
     col += vec3(1.00,0.66,0.30) * exp(-ang*24.0) * 0.42 * uSunL;
     col += vec3(1.00,0.85,0.55) * exp(-ang*88.0) * 1.45 * uSunL;
   }
+
+  addCometTail(ro, rd, tB, cometP, uSunPos, col);
 
   outColor = vec4(max(col, 0.0), 1.0);
 }`;
