@@ -832,6 +832,13 @@ body.scene-mw #bodies {
     white-space: nowrap
   }
 
+  /* PREV/NEXT duplicate what the horizontally-scrollable chip row above them
+     already does on a touch screen — just extra clutter here */
+  #bb-prev,
+  #bb-next {
+    display: none
+  }
+
   /* collapsible, so the sliders stop covering 42% of the screen */
   #ctrl {
     left: 10px;

@@ -937,6 +937,23 @@ void main(){
            : normalize(p - ce);
     vec3 L = normalize(uSunPos - p);              // light from the displaced Sun
     float dif = max(dot(n, L), 0.0);
+    /* the rings cast a real shadow across Saturn's globe — the single most
+       recognisable dark band in every photo of the planet. Sample whether
+       the ray from this surface point toward the Sun crosses the ring
+       plane within the ring's actual radius. */
+    if(id == 5){
+      vec3  sc5 = planetPos(5);
+      vec3  rn5 = vec3(0.0, 0.8934, 0.4494);
+      float dnL = dot(L, rn5);
+      if(abs(dnL) > 1e-4){
+        float tRs = dot(sc5 - p, rn5) / dnL;
+        if(tRs > 0.05){
+          float rrS = length((p + L*tRs) - sc5);
+          float uS  = (rrS/RAD[5] - 1.35) / 1.05;
+          if(uS > 0.0 && uS < 0.95) dif *= 0.12;
+        }
+      }
+    }
     float att = 1.0 / (1.0 + 0.011*length(p - uSunPos));   // gentler than inverse-square
     vec3 emissive = vec3(0.0);
     vec3 base = (id < 9) ? surface(id, n, emissive) : (id <= 19) ? moonSurface(n, id)
@@ -962,7 +979,14 @@ void main(){
     col = deepField(rd);
   }
 
-  /* ---- Saturn's rings: annulus in a plane tilted by its 26.7 deg obliquity ---- */
+  /* ---- Saturn's rings: annulus in a plane tilted by its 26.7 deg obliquity ----
+     Real bands, not one sine ripple + one gap: C ring (dim, dusty) then a
+     sharp inner edge into the much brighter B ring, then the Cassini
+     Division (a genuine gap, not a brightness dip — it falls out naturally
+     between where B ends and A begins), then the paler A ring with its own
+     thin Encke gap. u maps the same 1.35..2.40 planet-radii span as before;
+     real boundaries (C/B 1.526, B/Cassini 1.950, Cassini/A 2.027, Encke
+     2.216 R_saturn) converted through u=(r/R-1.35)/1.05. */
   vec3  sc = planetPos(5);
   vec3  rn = vec3(0.0, 0.8934, 0.4494);
   float dn = dot(rd, rn);
@@ -972,11 +996,20 @@ void main(){
       float rr = length((ro + rd*tr) - sc);
       float u  = (rr/RAD[5] - 1.35) / 1.05;       // 1.35 .. 2.40 planet radii
       if(u > 0.0 && u < 1.0){
-        float fine = 0.62 + 0.38*sin(u*54.0);
-        float cass = 1.0 - 0.82*exp(-pow((u-0.49)*13.0, 2.0));   // Cassini division
-        float edge = smoothstep(0.0,0.06,u) * (1.0 - smoothstep(0.90,1.0,u));
-        float aA   = clamp(fine*cass*edge*0.85, 0.0, 0.92);
-        vec3  rc   = mix(vec3(0.52,0.45,0.34), vec3(0.96,0.89,0.72), fine) * uSunL;
+        float cRing = smoothstep(0.0,0.03,u)   * (1.0-smoothstep(0.145,0.168,u));
+        float bRing = smoothstep(0.168,0.19,u) * (1.0-smoothstep(0.55,0.571,u));
+        float aRing = smoothstep(0.645,0.665,u)* (1.0-smoothstep(0.905,0.930,u));
+        float encke = 1.0 - 0.55*exp(-pow((u-0.825)*45.0, 2.0));   // thin gap inside the A ring
+        float density = cRing*0.40 + bRing*1.00 + aRing*0.78*encke;
+
+        float fine = 0.88 + 0.12*sin(u*70.0);     // subtle fine radial texture within a band
+        float edge = smoothstep(0.0,0.02,u) * (1.0 - smoothstep(0.985,1.0,u));
+        float aA   = clamp(density*fine*edge*0.90, 0.0, 0.94);
+
+        vec3 cCol = vec3(0.44,0.38,0.30);          // C ring: dusty brown, half-transparent
+        vec3 bCol = vec3(0.98,0.90,0.70);          // B ring: brightest, warm tan
+        vec3 aCol = vec3(0.80,0.76,0.68);          // A ring: paler, cooler
+        vec3  rc  = (cCol*cRing + bCol*bRing + aCol*aRing) * uSunL;
         col = mix(col, rc, aA);
       }
     }
