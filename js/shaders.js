@@ -1499,6 +1499,141 @@ void main(){
   outColor = vec4(max(col, 0.0), 1.0);
 }`;
 
+/* ============================ SCENE F: EXOPLANET SYSTEM =====================
+   TRAPPIST-1: seven terrestrial planets round a 2566 K ultracool dwarf, three
+   of them (e, f, g) inside the conservative habitable zone. Numbers are the
+   Agol et al. 2021 / Gillon et al. 2017 values, listed in XP_FACTS in
+   ephemeris.js so the JS light curve and this shader cannot drift apart.
+
+   Unlike every other scene here this one does NOT raymarch: it is eight solid
+   spheres, a flat annulus and some rings, so analytic ray-sphere intersection
+   is both sharper and far cheaper than stepping a volume that is empty almost
+   everywhere. There is no uSteps loop in this shader at all.
+
+   Two scalings, in the same spirit as the solar system scene's a^0.48:
+   - orbital radii compressed as a^0.62 about TRAPPIST-1b, because the real
+     system spans 0.0115-0.0619 AU = 21-112 stellar radii and at true scale the
+     star is a 4-pixel dot.
+   - planet radii exaggerated ~3x, or they would be under a pixel each.
+   The transit light curve in the HUD is computed from the REAL radius ratios,
+   so the depths it plots (0.34%-0.76%) are the true ones even though the
+   transits drawn here look much deeper. */
+export const FS_XP = GLSL_HEAD + `
+uniform float uOrb, uLum, uHZ, uRings;
+
+const float R_STAR = 1.2;
+const int   NP = 7;
+/* period (days), compressed orbital radius, display radius, surface colour */
+const float P_DAY[7] = float[7](1.510826, 2.421937, 4.049219, 6.101013,
+                                9.207540, 12.352446, 18.772866);
+const float P_ORB[7] = float[7](4.00, 5.65, 7.55, 9.20, 11.20, 12.85, 15.90);
+const float P_RAD[7] = float[7](0.29, 0.285, 0.205, 0.24, 0.27, 0.295, 0.196);
+/* HZ edges, same compression as P_ORB: 0.024-0.049 AU (conservative) */
+const float HZ_IN  = 8.05;
+const float HZ_OUT = 13.35;
+
+/* one displayed second is 0.6 days, so TRAPPIST-1b's year takes 2.5 s and
+   TRAPPIST-1h's 31 s — the near-resonant chain stays visible as a rhythm */
+const float DAY_RATE = 0.6;
+
+vec3 planetPos(int i){
+  float ang = uTime * uOrb * DAY_RATE * 6.28318530718 / P_DAY[i];
+  return vec3(cos(ang), 0.0, sin(ang)) * P_ORB[i];
+}
+vec3 planetCol(int i){
+  /* b/c are scorched rock, d/e are the temperate pair, f/g/h are likely
+     snowball worlds — no atmosphere has been detected on any of them, so these
+     are illustrative palettes, not observations */
+  if(i == 0) return vec3(0.52,0.30,0.22);
+  if(i == 1) return vec3(0.58,0.38,0.26);
+  if(i == 2) return vec3(0.62,0.55,0.48);
+  if(i == 3) return vec3(0.34,0.48,0.62);
+  if(i == 4) return vec3(0.66,0.72,0.80);
+  if(i == 5) return vec3(0.74,0.80,0.86);
+  return vec3(0.70,0.74,0.78);
+}
+
+/* nearest positive root of |o + t*d - c| = rad, or -1.0 */
+float hitSphere(vec3 o, vec3 d, vec3 c, float rad){
+  vec3  oc = o - c;
+  float b  = dot(oc, d);
+  float h  = b*b - dot(oc,oc) + rad*rad;
+  if(h < 0.0) return -1.0;
+  float t = -b - sqrt(h);
+  return (t > 0.0) ? t : -1.0;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+  vec3 rd = normalize(uCamMat * vec3(uv, -1.45));
+
+  float bestT = 1e9;
+  vec3  col   = vec3(0.0);
+  bool  hit   = false;
+
+  /* the star. 2566 K is deep orange-red; limb darkening is the strong one an
+     M dwarf actually shows, not the Sun's gentle gradient */
+  float ts = hitSphere(uCam, rd, vec3(0.0), R_STAR);
+  if(ts > 0.0){
+    vec3  n  = normalize(uCam + rd*ts);
+    float mu = max(dot(n, -rd), 0.0);
+    float ld = 0.35 + 0.65*pow(mu, 0.65);
+    col = vec3(1.35,0.46,0.14) * ld * uLum * 2.4;
+    bestT = ts; hit = true;
+  }
+
+  /* planets, lit by the star at the origin */
+  for(int i=0;i<NP;i++){
+    vec3  cp = planetPos(i);
+    float tp = hitSphere(uCam, rd, cp, P_RAD[i]);
+    if(tp > 0.0 && tp < bestT){
+      vec3  p   = uCam + rd*tp;
+      vec3  n   = normalize(p - cp);
+      vec3  l   = normalize(-p);                       // star is at the origin
+      float lam = max(dot(n, l), 0.0);
+      /* inverse-square dimming with distance from the star, plus a thin
+         terminator rim so the night side is not flat black */
+      float ill = uLum * 110.0 / dot(p, p);
+      col   = planetCol(i) * (lam*ill + 0.035)
+            + vec3(1.0,0.45,0.20) * pow(1.0 - max(dot(n,-rd),0.0), 4.0) * lam * 0.25;
+      bestT = tp; hit = true;
+    }
+  }
+
+  if(!hit) col = deepField(rd);
+
+  /* --- the equatorial plane: habitable zone band + orbit rings. Blended over
+     whatever is behind rather than depth-tested against it, so the band reads
+     as the translucent overlay it is. --- */
+  float tp = -uCam.y / (rd.y + 1e-9);
+  if(tp > 0.0 && tp < bestT){
+    vec3  q  = uCam + rd*tp;
+    float rq = length(q.xz);
+
+    /* HZ band: liquid water possible between these radii */
+    float band = smoothstep(HZ_IN*0.97, HZ_IN*1.03, rq)
+               * (1.0 - smoothstep(HZ_OUT*0.97, HZ_OUT*1.03, rq));
+    /* brighter at the edges so the boundaries are legible, not a flat wash */
+    float edge = max(smoothstep(HZ_IN*1.10, HZ_IN*1.00, rq),
+                     smoothstep(HZ_OUT*0.90, HZ_OUT*1.00, rq));
+    col += vec3(0.13,0.55,0.28) * band * (0.10 + 0.11*edge) * uHZ;
+
+    /* orbit rings */
+    float ring = 0.0;
+    for(int i=0;i<NP;i++) ring += smoothstep(0.055, 0.0, abs(rq - P_ORB[i]));
+    col += vec3(0.30,0.46,0.62) * min(ring, 1.0) * uRings * 0.42;
+  }
+
+  /* stellar glow, added last so it also washes over anything in front of it —
+     the star is faint in absolute terms (0.055% L_sun) but this is a close-up */
+  vec3  sdir = normalize(-uCam);
+  float sang = max(dot(rd, sdir), 0.0);
+  col += vec3(1.30,0.42,0.12) * pow(sang, 900.0) * uLum * 1.5;
+  col += vec3(0.60,0.20,0.06) * pow(sang, 90.0)  * uLum * 0.10;
+
+  outColor = vec4(max(col, 0.0), 1.0);
+}`;
+
 /* ---------------- post-processing passes ---------------- */
 export const FS_BRIGHT = `#version 300 es
 precision highp float;

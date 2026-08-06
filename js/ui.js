@@ -8,7 +8,7 @@
 import { S, SCENES, QUALITY, setDragging } from './state.js';
 import { bodyPos, bodyRad, FACTS, SUN_FACT, CERES_FACT, VESTA_FACT, PLUTO_FACT, slugFor, idForSlug } from './ephemeris.js';
 import { canvas } from './gl.js';
-import { resize, applyQuality, VIEW, setAutoCap, resetGood } from './render.js';
+import { resize, applyQuality, VIEW, setAutoCap, resetGood, snapNextFrame } from './render.js';
 
 const $ = id => document.getElementById(id);
 
@@ -17,6 +17,7 @@ let drag=false, lx=0, ly=0, idle=0;
 function down(x,y){
   drag=true; setDragging(true); lx=x; ly=y; idle=0;
   S.auto=false; syncAuto(); $('hint').classList.add('hide');
+  stopTour();                 // taking the camera back cancels the tour
 }
 function move(x,y){
   if(!drag) return;
@@ -148,6 +149,10 @@ bindSlider('s-psbeam','psBeam','v-psbeam');
 bindSlider('s-psmag','psMag','v-psmag');
 bindSlider('s-pstilt','psTilt','v-pstilt');
 bindSlider('s-pscomp','psComp','v-pscomp');
+bindSlider('s-xporb','xpOrb','v-xporb');
+bindSlider('s-xplum','xpLum','v-xplum');
+bindSlider('s-xphz','xpHZ','v-xphz');
+bindSlider('s-xprings','xpRings','v-xprings');
 bindSlider('s-nbdensity','nbDensity','v-nbdensity');
 bindSlider('s-nbproto','nbProto','v-nbproto');
 bindSlider('s-nbjet','nbJet','v-nbjet');
@@ -157,7 +162,10 @@ export function setScene(name){
   if(!SCENES[name]) return;
   S.scene = name;
   const sc = SCENES[name];
-  document.body.className = 'scene-' + name;
+  /* classList, not a wholesale className assignment: the guided tour puts its
+     own class on <body> and overwriting className would silently drop it */
+  Object.keys(SCENES).forEach(k => document.body.classList.remove('scene-' + k));
+  document.body.classList.add('scene-' + name);
   document.querySelectorAll('.navb').forEach(b => b.classList.toggle('on', b.dataset.go === name));
   $('ti-lbl').innerHTML = sc.lbl;
   $('ti-h1').textContent = sc.h1;
@@ -174,7 +182,7 @@ export function setScene(name){
   $('ret').style.display = (name === 'bh') ? '' : 'none';
   if(name === 'ss') setFocus(-1); else publishState();
 }
-document.querySelectorAll('.navb').forEach(b => b.onclick = ()=> setScene(b.dataset.go));
+document.querySelectorAll('.navb').forEach(b => b.onclick = ()=>{ stopTour(); setScene(b.dataset.go); });
 
 /* ---------------- body focus ---------------- */
 export function setFocus(id){
@@ -263,6 +271,108 @@ $('b-reset').onclick= ()=> reset();
 
 function toggleHud(){ S.hud = !S.hud; $('hud').classList.toggle('off', !S.hud); $('b-hud').classList.toggle('on', !S.hud); }
 
+/* ---------------- snapshot / share ----------------
+   The PNG is grabbed inside render.js's frame(), not here: without
+   preserveDrawingBuffer the back buffer is blank by the time a click handler
+   runs. Filename carries the scene so a folder of these stays sortable. */
+function snapshot(){
+  const b = $('b-snap');
+  b.classList.add('on'); b.textContent = 'CAPTURING';
+  snapNextFrame(cv => {
+    cv.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      let name = S.scene;
+      if(S.scene === 'ss' && S.focus >= 0) name += '-' + slugFor(S.focus);
+      a.href = url;
+      a.download = 'observatory-' + name + '-' + Date.now() + '.png';
+      a.click();
+      /* revoke on a delay, not immediately: the download reads the blob URL
+         asynchronously after click() returns, and tearing it down in the same
+         tick cancels the save in several browsers */
+      setTimeout(()=> URL.revokeObjectURL(url), 10000);
+      b.classList.remove('on'); b.textContent = 'SNAPSHOT';
+    }, 'image/png');
+  });
+}
+/* the hash already encodes scene + focus, so the current URL *is* the share
+   link — no separate serialisation to keep in sync */
+async function share(){
+  const b = $('b-share');
+  try{
+    await navigator.clipboard.writeText(location.href);
+    b.textContent = 'COPIED';
+  }catch(e){
+    /* clipboard is blocked on insecure origins and in some embedded webviews;
+       select the URL text instead of silently doing nothing */
+    b.textContent = location.href;
+  }
+  setTimeout(()=> b.textContent = 'COPY LINK', 1600);
+}
+$('b-snap').onclick  = snapshot;
+$('b-share').onclick = share;
+
+/* ---------------- unit toggle ----------------
+   Several scenes quote the camera radius in their own natural unit (Schwarzschild
+   radii, stellar radii, compressed AU). This flips those to SI, which is the only
+   way to see that e.g. 24 r_s at Sgr A* is 0.3 billion km. Scenes already quoted
+   in real units (kpc, pc) are unaffected — hud.js owns the conversions. */
+function toggleUnits(){
+  S.si = !S.si;
+  $('b-units').textContent = 'UNITS: ' + (S.si ? 'SI' : 'SCENE');
+  $('b-units').classList.toggle('on', S.si);
+}
+$('b-units').onclick = toggleUnits;
+
+/* ---------------- guided tour ----------------
+   Each stop is a deep link plus a caption; applyHash() already does all the
+   camera framing, so a stop is just "set the hash and wait". Any pointer drag
+   or scene click cancels the tour — fighting the user for the camera is worse
+   than stopping. */
+const TOUR = [
+  ['bh', 'SGR A*', 'The Milky Way’s central black hole. 4.3 million solar masses; the ring is light bent right around it.'],
+  ['bh', 'PHOTON SPHERE', 'At 1.5 Schwarzschild radii light can orbit. The dark disc is bigger than the horizon because of it.'],
+  ['mw', 'MILKY WAY', 'Our own barred spiral, seen from outside. Sgr A* sits at the centre of that bar.'],
+  ['ss', 'SOLAR SYSTEM', 'Eight planets, real eccentricities and inclinations. Orbital radii compressed as a^0.48 to fit the frame.'],
+  ['ss/earth', 'EARTH', 'The terminator and city lights on the night side are the giveaway that this is the one with people on it.'],
+  ['ss/saturn', 'SATURN', 'Ring band structure, and the ring shadow falling across the globe.'],
+  ['ps', 'PSR J0952−0607', 'The fastest and heaviest known neutron star: 707 rotations a second, 2.35 solar masses.'],
+  ['ps', 'BLACK WIDOW', 'It is eating the star that spun it up. The companion’s day side is 6,200 K, its night side 3,000 K.'],
+  ['nb', 'STELLAR NURSERY', 'H-alpha red where the gas is neutral, teal where the young cluster has ionised a cavity through it.'],
+  ['xp', 'TRAPPIST-1', 'Seven terrestrial planets round an ultracool dwarf. Three sit in the habitable zone band.'],
+  ['xp', 'TRANSIT METHOD', 'Watch the light curve: you never see the planets, you see the star dim by 0.34–0.76% on schedule.']
+];
+let tourIdx = -1, tourTimer = 0;
+export function tourRunning(){ return tourIdx >= 0; }
+
+function tourStep(){
+  tourIdx = (tourIdx + 1) % TOUR.length;
+  const [hash, head, body] = TOUR[tourIdx];
+  location.hash = hash;
+  applyHash();
+  S.auto = true; syncAuto();
+  $('tc-h').textContent = head;
+  $('tc-b').textContent = body;
+  tourTimer = setTimeout(tourStep, 11000);
+}
+export function stopTour(){
+  if(tourIdx < 0) return;
+  clearTimeout(tourTimer);
+  tourIdx = -1;
+  document.body.classList.remove('touring');
+  $('b-tour').classList.remove('on');
+  $('b-tour').textContent = 'TOUR';
+}
+function toggleTour(){
+  if(tourIdx >= 0){ stopTour(); return; }
+  document.body.classList.add('touring');
+  $('b-tour').classList.add('on');
+  $('b-tour').textContent = 'STOP TOUR';
+  tourIdx = -1;
+  tourStep();
+}
+$('b-tour').onclick = toggleTour;
+
 /* Foldable panels. Each auto-collapses when the viewport is too small to carry
    it — the control array covered 42% of a phone screen — but a manual toggle
    pins that panel's state so resizing never fights the user. */
@@ -293,8 +403,9 @@ function reset(){
             's-arm':1,'s-dust':1,'s-core':1,'s-hii':1,'s-rot':1,
             's-orbit':1,'s-sunl':1,'s-path':1,'s-detail':1,'s-belt':1,
             's-bary':0,'s-smark':1,
-            's-psspin':1,'s-psbeam':1,'s-psmag':1,'s-pstilt':0.65,
-            's-nbdensity':1,'s-nbproto':1,'s-nbjet':1 };
+            's-psspin':1,'s-psbeam':1,'s-psmag':1,'s-pstilt':0.65,'s-pscomp':1,
+            's-nbdensity':1,'s-nbproto':1,'s-nbjet':1,
+            's-xporb':1,'s-xplum':1,'s-xphz':1,'s-xprings':1 };
   for(const k in d){ $(k).value = d[k]; $(k).dispatchEvent(new Event('input')); }
 }
 
@@ -302,6 +413,8 @@ window.addEventListener('keydown', e=>{
   const k = e.key.toLowerCase();
   if(k==='h') toggleHud();
   if(k==='r') reset();
+  if(k==='t') toggleTour();
+  if(k==='u') toggleUnits();
   if(k==='q'){ S.quality=(S.quality+1)%QUALITY.length; setAutoCap(S.quality); resetGood(); applyQuality(true); }
   if(k===' '){ e.preventDefault(); S.auto=!S.auto; syncAuto(); }
   if(k==='1') setScene('bh');
@@ -309,9 +422,10 @@ window.addEventListener('keydown', e=>{
   if(k==='3') setScene('ss');
   if(k==='4') setScene('ps');
   if(k==='5') setScene('nb');
+  if(k==='6') setScene('xp');
   if(k==='tab'){
     e.preventDefault();
-    const order = ['bh','mw','ss','ps','nb'];
+    const order = ['bh','mw','ss','ps','nb','xp'];
     setScene(order[(order.indexOf(S.scene) + 1) % order.length]);
   }
   if(k==='arrowright' || k==='arrowdown'){ e.preventDefault(); cycleFocus(1); }

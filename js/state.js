@@ -10,12 +10,14 @@ export const S = {
   yaw: 0.62, pitch: 0.26, dist: 23.0,
   tYaw: 0.62, tPitch: 0.26, tDist: 23.0,
   auto: true, hud: true, quality: 2,
+  si: false,            // UNITS toggle: quote the camera radius in SI, not scene units
   disk: 1.15, lens: 1.0, spin: 1.0, dopp: 1.0, bloom: 1.05, star: 1.0, jet: 1.0,
   comp: 0.0, sep: 8.0, flare: 1.0,
   arm: 1.0, dust: 1.0, core: 1.0, hii: 1.0, rot: 1.0,
   orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 0.0, smark: 1.0,
   psSpin: 1.0, psBeam: 1.0, psMag: 1.0, psTilt: 0.65, psComp: 1.0,
   nbDensity: 1.0, nbProto: 1.0, nbJet: 1.0,
+  xpOrb: 1.0, xpLum: 1.0, xpHZ: 1.0, xpRings: 1.0,
   scene: 'bh', scale: 0.9, steps: 300,
   focus: -1,            // -1 = whole system, 0..7 = planet, 8 = Sun
   zoomed: false,        // user has zoomed manually: suppress auto re-framing
@@ -97,6 +99,22 @@ export const SCENES = {
         +'◆ DUST LANES ABSORBING VISIBLE LIGHT ◆ BIPOLAR JETS ALONG ACCRETION AXES ◆ '
         +'GRAVITATIONAL COLLAPSE ONGOING &middot; FUTURE OB ASSOCIATION ◆ '
         +'RADIATION PRESSURE SCULPTING PILLARS ◆ CLASSIFIED: DIFFUSE EMISSION NEBULA ◆'
+  },
+  xp: {
+    /* outermost orbit (h) sits at 15.9 display units; this frames all seven */
+    dist: 46.0, pitch: 0.34, min: 6.0, max: 120,
+    lbl: 'transit photometry // node-07',
+    h1:  'TRAPPIST-1',
+    sub: 'M8V ULTRACOOL DWARF &middot; 7 PLANETS &middot; 3 IN HABITABLE ZONE',
+    rlbl:'VIEW DISTANCE', runit:' R★', slbl:'RAY SOLVER',
+    meters:['STELLAR FLUX','ORBITAL RATE','HZ OCCUPANCY',
+            'TRANSIT DEPTH','PHOTOMETRIC NOISE'],
+    tick:'◆ TRANSIT PHOTOMETRY ONLINE ◆ TRAPPIST-1 · M8V · 2,566 K · 0.0898 M&#9737; · 0.1192 R&#9737; '
+        +'◆ 40.66 ly IN AQUARIUS ◆ SEVEN TERRESTRIAL PLANETS, PERIODS 1.51 d TO 18.77 d '
+        +'◆ e / f / g LIE IN THE CONSERVATIVE HABITABLE ZONE, 0.024–0.049 AU '
+        +'◆ NEAR-RESONANT CHAIN — EVERY ADJACENT PERIOD RATIO IS CLOSE TO A SMALL INTEGER RATIO '
+        +'◆ TRANSIT DEPTHS 0.34% TO 0.76% OF STELLAR FLUX ◆ ALL SEVEN TRANSIT: THAT IS HOW THEY WERE FOUND '
+        +'◆ NO ATMOSPHERE DETECTED ON ANY OF THEM AS YET ◆ ORBITAL RADII COMPRESSED AS a^0.62 FOR FRAMING ◆'
   }
 };
 

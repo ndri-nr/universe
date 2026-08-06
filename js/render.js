@@ -4,7 +4,7 @@
    live camera basis, republished every frame so ui.js's click-picking can
    rebuild the exact ray the shader used. */
 import { gl, canvas, FLOAT_OK, makeTarget, delTarget, bindTex, drawFull, vao } from './gl.js';
-import { P_SCENE, P_MW, P_SS, P_PULSAR, P_NEBULA, P_BRIGHT, P_BLUR, P_COMP } from './programs.js';
+import { P_SCENE, P_MW, P_SS, P_PULSAR, P_NEBULA, P_XP, P_BRIGHT, P_BLUR, P_COMP } from './programs.js';
 import { S, SCENES, QUALITY, dragging } from './state.js';
 import { bodyPos, sunPos } from './ephemeris.js';
 import { updateHud } from './hud.js';
@@ -47,6 +47,11 @@ export let onFirstFrame = () => {};
 export function setOnFirstFrame(fn){ onFirstFrame = fn; }
 
 let t0 = performance.now(), last = t0, fps = 60, frames = 0, acc = 0, started = false;
+
+/* one-shot screenshot hook, consumed at the end of the next frame() — see the
+   comment at the call site for why it cannot just be a function ui.js calls */
+let snapCb = null;
+export function snapNextFrame(cb){ snapCb = cb; }
 let good = 0, autoCap = 2;   // auto-scaler never climbs past HIGH; ULTRA stays manual
 export function setAutoCap(v){ autoCap = v; }
 export function resetGood(){ good = 0; }
@@ -112,7 +117,8 @@ export function frame(now){
   VIEW.cam = cam; VIEW.r = r; VIEW.u = u; VIEW.f = f; VIEW.t = t;   // for click-picking
 
   /* ---- pass 1: scene (shared camera/time uniforms, then scene-specific) ---- */
-  const PS = (S.scene === 'mw') ? P_MW : (S.scene === 'ss') ? P_SS : (S.scene === 'ps') ? P_PULSAR : (S.scene === 'nb') ? P_NEBULA : P_SCENE;
+  const PS = (S.scene === 'mw') ? P_MW : (S.scene === 'ss') ? P_SS : (S.scene === 'ps') ? P_PULSAR
+           : (S.scene === 'nb') ? P_NEBULA : (S.scene === 'xp') ? P_XP : P_SCENE;
   gl.bindVertexArray(vao);
   gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
   gl.viewport(0,0,scene.w,scene.h);
@@ -154,6 +160,11 @@ export function frame(now){
     gl.uniform1f(PS.u.uDensity, S.nbDensity);
     gl.uniform1f(PS.u.uProto,   S.nbProto);
     gl.uniform1f(PS.u.uJet,     S.nbJet);
+  } else if(S.scene === 'xp'){
+    gl.uniform1f(PS.u.uOrb,   S.xpOrb);
+    gl.uniform1f(PS.u.uLum,   S.xpLum);
+    gl.uniform1f(PS.u.uHZ,    S.xpHZ);
+    gl.uniform1f(PS.u.uRings, S.xpRings);
   } else {
     gl.uniform1f(PS.u.uLens, S.lens);
     gl.uniform1f(PS.u.uDisk, S.disk);
@@ -206,6 +217,12 @@ export function frame(now){
   gl.uniform1f(P_COMP.u.uBloomAmt, S.bloom*0.40);
   gl.uniform1f(P_COMP.u.uExp, FLOAT_OK ? 0.82 : 1.05);
   drawFull();
+
+  /* Screenshot has to happen right here, in the same tick as the composite
+     draw: the context is created without preserveDrawingBuffer (it costs frame
+     time on some drivers), so the back buffer is only readable before the
+     browser swaps it. Hence a queued callback rather than an exported grab(). */
+  if(snapCb){ const cb = snapCb; snapCb = null; cb(canvas); }
 
   if(!started){ started = true; onFirstFrame(); }
   if(S.hud) updateHud(t, RW, RH, fps);

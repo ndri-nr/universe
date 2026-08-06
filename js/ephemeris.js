@@ -119,6 +119,64 @@ export const VESTA_FACT = {n:'VESTA', d:'525 km', m:'0.00004 M⊕', g:'0.25 m/s�
 export const PLUTO_FACT = {n:'PLUTO', d:'2,377 km', m:'0.0022 M⊕', g:'0.62 m/s²',
                   day:'6.39 d', yr:'248 yr', mo:'5', T:'−229 °C', a:'39.5 AU'};
 
+/* ---------------- TRAPPIST-1 (exoplanet scene) ----------------
+   Agol et al. 2021 / Gillon et al. 2017. P_DAY and ORB here must match P_DAY
+   and P_ORB in FS_XP exactly — same rule as the solar system block above, since
+   the transit light curve is computed here while the picture is drawn there.
+
+   RK is the REAL radius ratio R_planet/R_star, which is what sets transit
+   depth (depth = RK^2, i.e. 0.34%-0.76% here). The shader draws the planets
+   about 3x oversized for visibility; the light curve does not, so the depths it
+   plots are the true ones. R_star = 0.1192 R_sun, R_earth/R_sun = 0.009168. */
+export const XP_STAR = {n:'TRAPPIST-1', cls:'M8V ultracool dwarf', T:'2,566 K',
+                        m:'0.0898 M☉', rad:'0.1192 R☉', L:'0.000553 L☉',
+                        d:'40.66 ly (12.47 pc)', con:'Aquarius', age:'7.6 Gyr'};
+export const XP_FACTS = [
+  {n:'b', P:1.510826,  au:0.01154, re:1.116, rk:0.0858, hz:false, T:'+126 °C'},
+  {n:'c', P:2.421937,  au:0.01580, re:1.097, rk:0.0844, hz:false, T:'+65 °C'},
+  {n:'d', P:4.049219,  au:0.02227, re:0.788, rk:0.0606, hz:false, T:'−9 °C'},
+  {n:'e', P:6.101013,  au:0.02925, re:0.920, rk:0.0708, hz:true,  T:'−22 °C'},
+  {n:'f', P:9.207540,  au:0.03849, re:1.045, rk:0.0804, hz:true,  T:'−54 °C'},
+  {n:'g', P:12.352446, au:0.04683, re:1.129, rk:0.0868, hz:true,  T:'−75 °C'},
+  {n:'h', P:18.772866, au:0.06189, re:0.755, rk:0.0581, hz:false, T:'−104 °C'}
+];
+export const XP_ORB   = [4.00, 5.65, 7.55, 9.20, 11.20, 12.85, 15.90]; // = P_ORB in FS_XP
+export const XP_DAY_RATE = 0.6;                                        // = DAY_RATE in FS_XP
+
+/* Transit flux at time t, seen from a fixed direction in the orbital plane
+   (+z here, matching the shader's xz orbit plane). A planet transits when it is
+   on the near side and its projected offset from the stellar disc centre is
+   under R_star + R_planet; the smoothstep across that window is the ingress and
+   egress ramp. Real transits have a limb-darkened, near-flat floor, which this
+   approximates rather than integrates. Impact parameter is taken as 0 — the
+   real ones are small and all seven do transit, which is why the system was
+   found by transit photometry in the first place.
+
+   What is real here and what is not: the DEPTHS are real, because they come from
+   the true radius ratios. The DURATIONS are stretched by the same a^0.62 orbital
+   compression the scene is drawn with — geometrically a real TRAPPIST-1b transit
+   covers 1.7% of its orbit and would be under a pixel wide on this plot, so the
+   curve is deliberately consistent with the picture above it rather than with
+   the sky. */
+export function xpFlux(t){
+  let f = 1.0;
+  for(let i=0;i<XP_FACTS.length;i++){
+    const P = XP_FACTS[i], k = P.rk;
+    const ang = t * S.xpOrb * XP_DAY_RATE * 2*Math.PI / P.P;
+    const x = Math.cos(ang), z = Math.sin(ang);
+    if(z <= 0) continue;                        // far side: occultation, not transit
+    const sep = Math.abs(x) * XP_ORB[i];        // projected offset in display units
+    const sepR = sep / 1.2;                     // ...in stellar radii (R_STAR = 1.2)
+    const cov = 1.0 - smooth01(sepR, 1.0 - k, 1.0 + k);
+    f -= cov * k * k;
+  }
+  return f;
+}
+function smooth01(x, a, b){
+  const u = Math.min(Math.max((x - a)/(b - a), 0), 1);
+  return u*u*(3 - 2*u);
+}
+
 /* ---------------- deep links ----------------
    #bh, #mw, #ss, #ss/saturn — the body slug lives here since it's really part
    of the planet catalogue, not the routing logic itself (ui.js owns that). */

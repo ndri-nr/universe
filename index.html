@@ -56,6 +56,8 @@
             PULSAR</span></button>
         <button class="navb" data-go="nb"><span class="full">◈ NEBULA</span><span class="abbr">◈
             NEBULA</span></button>
+        <button class="navb" data-go="xp"><span class="full">◈ EXOPLANETS</span><span class="abbr">◈
+            EXO</span></button>
       </div>
 
       <div id="bodies" class="panel" data-sc="ss">
@@ -128,10 +130,21 @@
           <div class="row" data-sc="nb"><span>ACTIVE PROTOSTARS</span><b id="nb-p">0</b></div>
           <div class="row" data-sc="nb"><span>JET STATE</span><b id="nb-j">0</b></div>
           <div class="row" data-sc="nb"><span>NEAREST PROTOSTAR</span><b id="nb-n">0</b></div>
+          <div class="row" data-sc="xp"><span>STELLAR FLUX</span><b id="xp-f">0</b></div>
+          <div class="row" data-sc="xp"><span>IN TRANSIT</span><b id="xp-t">0</b></div>
+          <div class="row" data-sc="xp"><span>HZ PLANETS</span><b id="xp-h">0</b></div>
+          <div class="row" data-sc="xp"><span>INNERMOST YEAR</span><b id="xp-y">0</b></div>
+          <div class="row" data-sc="xp"><span>DEEPEST TRANSIT</span><b id="xp-d">0</b></div>
           <div class="row"><span id="t-sl">PHOTON STEPS</span><b id="t-s">0</b></div>
           <div class="row"><span>RENDER</span><b id="t-p">0</b></div>
           <div class="row"><span>FRAME RATE</span><b id="t-f">0</b></div>
           <div class="row"><span>LINK</span><b id="t-l" class="warn">STABLE</b></div>
+        </div>
+        <!-- transit light curve: exoplanet scene only, hidden by the same
+             [data-sc] rule every other per-scene HUD element uses -->
+        <div id="lcwrap" data-sc="xp">
+          <div class="lbl">transit light curve &middot; relative flux</div>
+          <canvas id="lc" width="420" height="70"></canvas>
         </div>
       </div>
     </div><!-- /topstack -->
@@ -250,6 +263,19 @@
         <input id="s-pscomp" type="range" min="0" max="2.5" step="0.01" value="1">
       </div>
 
+      <div class="ctl" data-sc="xp"><label>ORBITAL RATE <var id="v-xporb">1.00</var></label>
+        <input id="s-xporb" type="range" min="0" max="3" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="xp"><label>STELLAR LUMINOSITY <var id="v-xplum">1.00</var></label>
+        <input id="s-xplum" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="xp"><label>HABITABLE ZONE BAND <var id="v-xphz">1.00</var></label>
+        <input id="s-xphz" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="xp"><label>ORBIT PATHS <var id="v-xprings">1.00</var></label>
+        <input id="s-xprings" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+
       <div class="ctl" data-sc="nb"><label>CLOUD DENSITY <var id="v-nbdensity">1.00</var></label>
         <input id="s-nbdensity" type="range" min="0" max="2.5" step="0.01" value="1">
       </div>
@@ -271,11 +297,19 @@
         <button id="b-q">QUALITY: HIGH</button>
         <button id="b-hud">HUD</button>
         <button id="b-reset">RESET</button>
+        <button id="b-tour">TOUR</button>
+        <button id="b-units">UNITS: SCENE</button>
+        <button id="b-snap">SNAPSHOT</button>
+        <button id="b-share">COPY LINK</button>
       </div>
     </div>
 
+    <!-- guided tour caption, sits above the ticker -->
+    <div id="tourcap"><b id="tc-h">—</b><span id="tc-b">—</span></div>
+
     <div id="hint">DRAG&nbsp;=&nbsp;ORBIT &nbsp;&middot;&nbsp; SCROLL&nbsp;=&nbsp;APPROACH &nbsp;&middot;&nbsp;
-      TAB&nbsp;/&nbsp;1&nbsp;2&nbsp;3&nbsp;4&nbsp;=&nbsp;SCENE &nbsp;&middot;&nbsp; &larr;&nbsp;&rarr;&nbsp;=&nbsp;BODY
+      TAB&nbsp;/&nbsp;1&nbsp;2&nbsp;3&nbsp;4&nbsp;5&nbsp;6&nbsp;=&nbsp;SCENE &nbsp;&middot;&nbsp;
+      &larr;&nbsp;&rarr;&nbsp;=&nbsp;BODY &nbsp;&middot;&nbsp; T&nbsp;=&nbsp;TOUR
       &nbsp;&middot;&nbsp; H&nbsp;=&nbsp;HUD &nbsp;&middot;&nbsp; R&nbsp;=&nbsp;RESET</div>
     <div id="tick">
       <div>◆ GRAVITATIONAL WAVE DETECTOR ONLINE ◆ EVENT HORIZON RADIUS 1.27e10 M ◆ ACCRETION RATE 1.4e-8 M⊙/YR ◆ PHOTON
