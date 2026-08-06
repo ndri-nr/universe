@@ -1152,6 +1152,104 @@ void main(){
   outColor = vec4(max(col, 0.0), 1.0);
 }`;
 
+/* ============================ SCENE D: NEUTRON STAR / PULSAR ================
+   A bounded volumetric march (same shape as the Milky Way scene's — no
+   geodesic bending needed here, a neutron star's gravity is strong but its
+   surface sits above the photon sphere, unlike a black hole). The whole
+   point of a pulsar is the "oblique rotator" model: the beam runs along the
+   MAGNETIC axis, which is tilted away from the spin axis, so as the star
+   spins the beam sweeps a cone through space — that misalignment is why it
+   pulses at all rather than just glowing steadily. */
+export const FS_PULSAR = GLSL_HEAD + `
+uniform float uSpin, uBeam, uMag, uTilt;
+
+const float R_STAR = 1.0;
+const float R_HALO = 40.0;
+
+/* emission at p; also returns the local absorption coefficient */
+vec3 pulsarEmit(vec3 p, out float ab){
+  ab = 0.0;
+  float r = length(p);
+  if(r > R_HALO) return vec3(0.0);
+
+  /* the star itself needs to behave like an opaque surface, not more
+     volumetric haze — without this the march keeps re-adding the "surface"
+     emission every step it spends near r~R_STAR (many steps, at this
+     scene's step count), massively overexposing what should read as one
+     small bright disc */
+  if(r < R_STAR*0.97) ab = 60.0;
+
+  /* the magnetic axis precesses around the (fixed, vertical) spin axis as
+     the star spins — tilt is a slider so uTilt=0 collapses to an aligned,
+     non-pulsing rotator (a real, if less interesting, class of pulsar) */
+  float spinAng = uTime * uSpin * 4.0;
+  float tilt = uTilt;
+  vec3  magAxis = normalize(vec3(sin(tilt)*cos(spinAng), cos(tilt), sin(tilt)*sin(spinAng)));
+
+  float rp = max(r, R_STAR*0.3);
+  float cosTheta = dot(p, magAxis) / rp;
+
+  /* two oppositely-directed lighthouse beams along the magnetic axis. Decay
+     has to be steep (not the black hole jet's gentle falloff) — this scene
+     integrates over a much longer, coarser-stepped path, so a slowly-fading
+     density accumulates into a wash of light rather than a contained beam. */
+  float beamA = pow(max(cosTheta, 0.0), 26.0);
+  float beamB = pow(max(-cosTheta, 0.0), 26.0);
+  float beam  = (beamA + beamB) * smoothstep(R_STAR*1.05, R_STAR*2.2, r) * exp(-r*0.55);
+  /* faint turbulent flicker along the beam so it doesn't look like a static cone */
+  float flick = 0.75 + 0.5*vnoise(vec3(cosTheta*30.0, r*1.4 - uTime*uSpin*6.0, 0.0));
+  beam *= flick;
+
+  /* stylized dipole-shaped magnetosphere glow — denser away from the poles,
+     same sin²(latitude) shape a real dipole field's equatorial belt has,
+     not literal field-line tracing. Same steep-decay reasoning as the beam. */
+  float dipole = (1.0 - cosTheta*cosTheta) * exp(-r*0.85) * smoothstep(R_STAR*0.95, R_STAR*1.3, r);
+
+  float surface = smoothstep(R_STAR*1.02, R_STAR*0.88, r);
+  float gran    = fbm(normalize(p)*6.0 + uTime*0.15);
+
+  vec3 col = vec3(0.0);
+  col += mix(vec3(1.3,1.5,2.0), vec3(1.7,1.8,2.1), gran) * surface * 1.6;
+  col += vec3(0.55,0.75,1.65) * beam * uBeam * 2.6;
+  col += vec3(0.30,0.50,1.05) * dipole * uMag * 0.40;
+
+  ab += (dipole*0.25 + beam*0.06) * 0.10;
+  return col;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+  vec3 rd = normalize(uCamMat * vec3(uv, -1.45));
+
+  vec3  col   = vec3(0.0);
+  float trans = 1.0;
+
+  float b    = dot(uCam, rd);
+  float cc   = dot(uCam, uCam) - R_HALO*R_HALO;
+  float disc = b*b - cc;
+  if(disc > 0.0){
+    float sq = sqrt(disc);
+    float t0 = max(-b - sq, 0.0);
+    float t1 = -b + sq;
+    int   ns = min(uSteps, 220);
+    float dt = (t1 - t0) / float(ns);
+    float jit = h13(vec3(gl_FragCoord.xy, floor(uTime*24.0)));
+    float t = t0 + dt*jit;
+    for(int i=0;i<MAXS;i++){
+      if(i >= ns || trans < 0.003) break;
+      float ab;
+      float d2 = h13(vec3(gl_FragCoord.xy, float(i) + jit*13.0)) - 0.5;
+      vec3 em = pulsarEmit(uCam + rd*(t + dt*d2*0.9), ab);
+      col   += trans * em * dt;
+      trans *= exp(-ab*dt);
+      t     += dt;
+    }
+  }
+
+  col += trans * deepField(rd);
+  outColor = vec4(max(col, 0.0), 1.0);
+}`;
+
 /* ---------------- post-processing passes ---------------- */
 export const FS_BRIGHT = `#version 300 es
 precision highp float;

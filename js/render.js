@@ -4,7 +4,7 @@
    live camera basis, republished every frame so ui.js's click-picking can
    rebuild the exact ray the shader used. */
 import { gl, canvas, FLOAT_OK, makeTarget, delTarget, bindTex, drawFull, vao } from './gl.js';
-import { P_SCENE, P_MW, P_SS, P_BRIGHT, P_BLUR, P_COMP } from './programs.js';
+import { P_SCENE, P_MW, P_SS, P_PULSAR, P_BRIGHT, P_BLUR, P_COMP } from './programs.js';
 import { S, SCENES, QUALITY, dragging } from './state.js';
 import { bodyPos, sunPos } from './ephemeris.js';
 import { updateHud } from './hud.js';
@@ -112,7 +112,7 @@ export function frame(now){
   VIEW.cam = cam; VIEW.r = r; VIEW.u = u; VIEW.f = f; VIEW.t = t;   // for click-picking
 
   /* ---- pass 1: scene (shared camera/time uniforms, then scene-specific) ---- */
-  const PS = (S.scene === 'mw') ? P_MW : (S.scene === 'ss') ? P_SS : P_SCENE;
+  const PS = (S.scene === 'mw') ? P_MW : (S.scene === 'ss') ? P_SS : (S.scene === 'ps') ? P_PULSAR : P_SCENE;
   gl.bindVertexArray(vao);
   gl.bindFramebuffer(gl.FRAMEBUFFER, scene.fb);
   gl.viewport(0,0,scene.w,scene.h);
@@ -144,6 +144,11 @@ export function frame(now){
     gl.uniform1f(PS.u.uBelt,   S.belt * near);
     const sp = sunPos(t);
     gl.uniform3f(PS.u.uSunPos, sp[0], sp[1], sp[2]);
+  } else if(S.scene === 'ps'){
+    gl.uniform1f(PS.u.uSpin, S.psSpin);
+    gl.uniform1f(PS.u.uBeam, S.psBeam);
+    gl.uniform1f(PS.u.uMag,  S.psMag);
+    gl.uniform1f(PS.u.uTilt, S.psTilt);
   } else {
     gl.uniform1f(PS.u.uLens, S.lens);
     gl.uniform1f(PS.u.uDisk, S.disk);

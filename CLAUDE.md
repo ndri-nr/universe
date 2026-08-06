@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A raymarched WebGL2 "observatory" with three switchable scenes: a Schwarzschild black hole (Sgr A*), the Milky Way, and the Solar System. Static site, ES modules, no build step, no deps.
+A raymarched WebGL2 "observatory" with four switchable scenes: a Schwarzschild black hole (Sgr A*), the Milky Way, the Solar System, and a neutron star/pulsar. Static site, ES modules, no build step, no deps.
 
 ## Running / testing
 
@@ -40,7 +40,7 @@ Import graph is a DAG, no cycles: `state.js`/`shaders.js` are leaves; `render.js
 
 ### Shader pipeline (`js/shaders.js`)
 - `GLSL_HEAD` — shared prelude (uniforms, hash/noise functions, procedural starfield/nebula `deepField()`) prepended to each scene's fragment shader source.
-- Three scene fragment shaders, each a full raymarcher: `FS_SCENE` (black hole — null geodesic integration via RK2, accretion disk, relativistic jet), `FS_MW` (galaxy), `FS_SS` (solar system — planets, moons, asteroid belt, orbit rings).
+- Four scene fragment shaders, each a full raymarcher: `FS_SCENE` (black hole — null geodesic integration via RK2, accretion disk, relativistic jet), `FS_MW` (galaxy), `FS_SS` (solar system — planets, moons, asteroid belt, orbit rings), `FS_PULSAR` (neutron star — oblique-rotator lighthouse beams, no geodesic bending needed since its surface sits above the photon sphere).
 - Post pipeline: `FS_BRIGHT` (bloom threshold) → `FS_BLUR` (separable gaussian, run twice for two mip levels into `bloomA`/`bloomB`) → `FS_COMP` (final composite: ACES tonemap, chromatic aberration, vignette, scanlines, grain).
 - `prog(fs)` (in `gl.js`) compiles+links each shader, auto-introspects active uniforms into a `{name: location}` map — no manual uniform location bookkeeping.
 

@@ -26,6 +26,7 @@ export function updateHud(t, RW, RH, fps){
 
   const m = (S.scene === 'mw') ? hudGalaxy(t, r)
           : (S.scene === 'ss') ? hudSolar(t, r)
+          : (S.scene === 'ps') ? hudPulsar(t, r)
           : hudHole(t, r);
   for(let i=0;i<5;i++){
     const v = Math.max(0, Math.min(100, m[i]));
@@ -103,6 +104,36 @@ function hudSolar(t, r){
     S.path*32 + 5*Math.sin(t*2.4),
     S.belt*34 + 7*Math.abs(Math.sin(t*1.3)),
     8 + 6*Math.abs(Math.sin(t*0.6))
+  ];
+}
+
+/* --- Pulsar readouts. The oblique-rotator model: the beam runs along the
+   magnetic axis, tilted from the spin axis by psTilt, so BEAM PHASE tracks
+   whether that axis currently points anywhere near the line of sight —
+   that misalignment is the entire reason a pulsar pulses instead of just
+   glowing steadily. --- */
+function hudPulsar(t, r){
+  const periodMs = 115 / Math.max(S.psSpin, 0.05);
+  $('ps-p').textContent = periodMs.toFixed(1) + ' ms';
+  $('ps-o').textContent = (S.psTilt*180/Math.PI).toFixed(1) + '°';
+  $('ps-l').textContent = (5480/Math.max(S.psSpin, 0.05)).toFixed(0) + ' km';
+
+  const phase = (t*S.psSpin*4) % (2*Math.PI);
+  const pulsing = Math.abs(Math.cos(phase)) > 0.85;
+  const pb = $('ps-b');
+  pb.textContent = pulsing ? 'PULSE' : (phase*180/Math.PI).toFixed(0) + '°';
+  pb.className = pulsing ? 'crit' : '';
+
+  const link = $('t-l');
+  if(r < 3){ link.textContent = 'LIGHT CYLINDER'; link.className = 'warn'; }
+  else { link.textContent = 'STABLE'; link.className = ''; }
+
+  return [
+    S.psBeam*40 + 8*Math.abs(Math.sin(t*3.0)),
+    S.psMag*36 + 7*Math.sin(t*1.6),
+    S.psSpin*44 + 6*Math.sin(t*2.2),
+    (S.psTilt/1.57)*100,
+    10 + 8*Math.abs(Math.sin(t*0.6))
   ];
 }
 

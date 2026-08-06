@@ -143,6 +143,10 @@ bindSlider('s-detail','detail','v-detail');
 bindSlider('s-belt','belt','v-belt');
 bindSlider('s-bary','bary','v-bary');
 bindSlider('s-smark','smark','v-smark');
+bindSlider('s-psspin','psSpin','v-psspin');
+bindSlider('s-psbeam','psBeam','v-psbeam');
+bindSlider('s-psmag','psMag','v-psmag');
+bindSlider('s-pstilt','psTilt','v-pstilt');
 
 /* ---------------- scene switching ---------------- */
 export function setScene(name){
@@ -284,7 +288,8 @@ function reset(){
   const d={ 's-disk':1.15,'s-lens':1,'s-spin':1,'s-jet':1,'s-dopp':1,'s-comp':0,'s-sep':8,'s-flare':1,'s-bloom':1.05,'s-star':1,
             's-arm':1,'s-dust':1,'s-core':1,'s-hii':1,'s-rot':1,
             's-orbit':1,'s-sunl':1,'s-path':1,'s-detail':1,'s-belt':1,
-            's-bary':0,'s-smark':1 };
+            's-bary':0,'s-smark':1,
+            's-psspin':1,'s-psbeam':1,'s-psmag':1,'s-pstilt':0.65 };
   for(const k in d){ $(k).value = d[k]; $(k).dispatchEvent(new Event('input')); }
 }
 
@@ -297,9 +302,10 @@ window.addEventListener('keydown', e=>{
   if(k==='1') setScene('bh');
   if(k==='2') setScene('mw');
   if(k==='3') setScene('ss');
+  if(k==='4') setScene('ps');
   if(k==='tab'){
     e.preventDefault();
-    const order = ['bh','mw','ss'];
+    const order = ['bh','mw','ss','ps'];
     setScene(order[(order.indexOf(S.scene) + 1) % order.length]);
   }
   if(k==='arrowright' || k==='arrowdown'){ e.preventDefault(); cycleFocus(1); }

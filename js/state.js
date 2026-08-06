@@ -14,6 +14,7 @@ export const S = {
   comp: 0.0, sep: 8.0, flare: 1.0,
   arm: 1.0, dust: 1.0, core: 1.0, hii: 1.0, rot: 1.0,
   orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 0.0, smark: 1.0,
+  psSpin: 1.0, psBeam: 1.0, psMag: 1.0, psTilt: 0.65,
   scene: 'bh', scale: 0.9, steps: 300,
   focus: -1,            // -1 = whole system, 0..7 = planet, 8 = Sun
   zoomed: false,        // user has zoomed manually: suppress auto re-framing
@@ -61,6 +62,19 @@ export const SCENES = {
         +'◆ ORBITAL RADII COMPRESSED AS a^0.48 FOR FRAMING · PERIODS REMAIN KEPLERIAN T ∝ a^1.5 '
         +'◆ MERCURY 88 d · NEPTUNE 60190 d ◆ ASTEROID BELT 2.2 &ndash; 3.2 AU '
         +'◆ SATURN RING SYSTEM: CASSINI DIVISION RESOLVED ◆ HELIOPAUSE AT 123 AU ◆'
+  },
+  ps: {
+    dist: 14.0, pitch: 0.32, min: 3.0, max: 40,
+    lbl: 'timing array // node-07',
+    h1:  'PSR J0002+66',
+    sub: 'OBLIQUE ROTATOR &middot; P = 115 ms &middot; B = 1.2e8 T',
+    rlbl:'OBS RADIUS', runit:' r_ns', slbl:'MARCH STEPS',
+    meters:['BEAM LUMINOSITY','MAGNETOSPHERE DENSITY','SPIN RATE',
+            'MAGNETIC OBLIQUITY','TIMING NOISE FLOOR'],
+    tick:'◆ TIMING ARRAY LOCKED ◆ SPIN PERIOD 115 ms · SLOWING 1.4e-15 s/s ◆ SURFACE FIELD 1.2e8 T '
+        +'◆ MAGNETIC AXIS OBLIQUE TO SPIN AXIS — THE OBLIQUE ROTATOR IS WHY IT PULSES AT ALL '
+        +'◆ LIGHT CYLINDER RADIUS 5,480 km ◆ TWIN LIGHTHOUSE BEAMS ALONG THE MAGNETIC POLES '
+        +'◆ DISPERSION MEASURE 116.5 pc·cm&#8315;&sup3; ◆ CLASSIFIED: ROTATION-POWERED PULSAR ◆'
   }
 };
 

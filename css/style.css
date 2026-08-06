@@ -424,17 +424,19 @@ button.on {
   box-shadow: 0 0 12px rgba(255, 180, 87, .24)
 }
 
-/* per-scene HUD rows: body carries scene-bh / scene-mw / scene-ss */
+/* per-scene HUD rows: body carries scene-bh / scene-mw / scene-ss / scene-ps */
 body.scene-bh [data-sc]:not([data-sc="bh"]),
 body.scene-mw [data-sc]:not([data-sc="mw"]),
-body.scene-ss [data-sc]:not([data-sc="ss"]) {
+body.scene-ss [data-sc]:not([data-sc="ss"]),
+body.scene-ps [data-sc]:not([data-sc="ps"]) {
   display: none
 }
 
 /* #bodies gets an ID-level hide too, so a later `#bodies{display:...}` rule
    cannot silently out-specify the attribute selector above */
 body.scene-bh #bodies,
-body.scene-mw #bodies {
+body.scene-mw #bodies,
+body.scene-ps #bodies {
   display: none
 }
 
@@ -731,7 +733,7 @@ body.scene-mw #bodies {
 
   #nav {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 4px
   }
 
