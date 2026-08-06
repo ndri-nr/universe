@@ -425,8 +425,8 @@
       <input id="s-detail" type="range" min="0" max="2" step="0.01" value="1"></div>
     <div class="ctl" data-sc="ss"><label>ASTEROID BELT <var id="v-belt">1.00</var></label>
       <input id="s-belt" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="ss"><label>SUN BARYCENTRE WOBBLE <var id="v-bary">1.00</var></label>
-      <input id="s-bary" type="range" min="0" max="3" step="0.01" value="1"></div>
+    <div class="ctl" data-sc="ss"><label>SUN BARYCENTRE WOBBLE <var id="v-bary">0.00</var></label>
+      <input id="s-bary" type="range" min="0" max="3" step="0.01" value="0"></div>
     <div class="ctl" data-sc="mw"><label>SOLAR ORBIT MARKER <var id="v-smark">1.00</var></label>
       <input id="s-smark" type="range" min="0" max="2.5" step="0.01" value="1"></div>
 
@@ -877,6 +877,17 @@ const float SUN_R = 1.50;
 const float AU[8]   = float[8](0.387, 0.723, 1.000, 1.524, 5.203, 9.537, 19.19, 30.07);
 const float RAD[8]  = float[8](0.26,  0.40,  0.42,  0.32,  0.92,  0.80,  0.60,  0.58);
 const float PH0[8]  = float[8](0.90,  2.30,  0.40,  3.90,  1.60,  5.10,  2.80,  4.40);
+/* real orbital eccentricities, ecliptic inclinations, and longitudes of
+   ascending node (all radians) — Mercury is both the most eccentric AND the
+   most tilted, Neptune is nearly flat and nearly circular. NODE is the
+   direction each orbital plane tilts around: without it every inclined
+   orbit leans the same way (around the x-axis) and only differs in how
+   much, which reads as "everything tilts on one hinge". Real planets tilt
+   around different lines entirely, scattered ~0-360°. Mirrored in JS as
+   P_ECC/P_INC/P_NODE. */
+const float ECC[8]  = float[8](0.2056, 0.0068, 0.0167, 0.0934, 0.0489, 0.0565, 0.0457, 0.0113);
+const float INC[8]  = float[8](0.12228,0.05926,0.0,    0.03229,0.02275,0.04337,0.01347,0.03087);
+const float NODE[8] = float[8](0.8436, 1.3384, 0.0,    0.8650, 1.7537, 1.9840, 1.2919, 2.2996);
 const float SATR    = 12.40;   // Saturn's compressed orbital radius (index 5)
 
 float orbR(int i){ return 4.6 * pow(AU[i], 0.48); }
@@ -887,10 +898,20 @@ float orbR(int i){ return 4.6 * pow(AU[i], 0.48); }
 const float ORB_RATE = 0.16;
 
 vec3 planetPos(int i){
-  float a = PH0[i] + uTime * pow(AU[i], -1.5) * ORB_RATE * uOrbit;
-  float R = orbR(i);
-  float inc = 0.014 * float(i+1);            // slight inclinations, not a flat plane
-  return vec3(cos(a)*R, sin(a)*R*sin(inc), sin(a)*R*cos(inc));
+  float m   = uTime * pow(AU[i], -1.5) * ORB_RATE * uOrbit;   // anomaly progress since t=0
+  float nu  = PH0[i] + m;                                     // in-plane angle
+  /* true ellipse, periapsis at m=0 (i.e. at each planet's own PH0 direction):
+     r = a_semi(1-e^2)/(1+e*cos m). Replaces the old perfect circle. */
+  float R   = orbR(i) * (1.0 - ECC[i]*ECC[i]) / (1.0 + ECC[i]*cos(m));
+  /* orbital-plane basis: u is the line of nodes (where the tilted plane
+     crosses the ecliptic), w is u rotated 90° within the plane and lifted
+     out of the ecliptic by INC. Both hinge on NODE[i], so each planet tilts
+     around its own line, not a shared one. */
+  float cn = cos(NODE[i]), sn = sin(NODE[i]);
+  float ci = cos(INC[i]),  si = sin(INC[i]);
+  vec3  u  = vec3(cn, 0.0, sn);
+  vec3  w  = vec3(-sn*ci, si, cn*ci);
+  return R * (cos(nu)*u + sin(nu)*w);
 }
 
 float iSphere(vec3 ro, vec3 rd, vec3 ce, float ra){
@@ -1025,22 +1046,93 @@ void main(){
     }
   }
 
-  /* ---- orbit paths + asteroid belt on the ecliptic, only where unoccluded ---- */
+  /* ---- per-planet orbit rings ----
+     Each ring lives in ITS OWN inclined plane, hinged on its OWN line of
+     nodes (NODE[i]), and traces the true ellipse (periapsis at PH0[i]) —
+     matching planetPos() exactly. Previously every ring was a flat circle at
+     y=0, then later a circle tilted only around the x-axis, so a planet
+     could visibly sit off its own ring or every tilt read as "the same
+     hinge". Testing against the actual (u,w) orbital plane fixes both. */
+  {
+    float g = 0.0;
+    for(int i=0;i<8;i++){
+      float cn = cos(NODE[i]), sn = sin(NODE[i]);
+      float ci = cos(INC[i]),  si = sin(INC[i]);
+      vec3  u  = vec3(cn, 0.0, sn);
+      vec3  w  = vec3(-sn*ci, si, cn*ci);
+      vec3  ni = cross(u, w);                     // orbital-plane normal
+      float dn = dot(rd, ni);
+      if(abs(dn) > 1e-5){
+        float t = -dot(ro, ni) / dn;
+        if(t > 0.0 && t < tB){
+          vec3  p   = ro + rd*t;                  // point lies exactly in-plane
+          float lu  = dot(p, u), lw = dot(p, w);  // in-plane coords
+          float ang = atan(lw, lu);
+          float rho = length(vec2(lu, lw));
+          float ex  = orbR(i) * (1.0 - ECC[i]*ECC[i]) / (1.0 + ECC[i]*cos(ang - PH0[i]));
+          g += 0.0055 / (abs(rho - ex) + 0.016);
+        }
+      }
+    }
+    col += vec3(0.30,0.72,0.95) * g * uPath;
+  }
+
+  /* ---- barycentre marker, on the ecliptic, only where unoccluded ---- */
   if(abs(rd.y) > 1e-4){
     float tp = -ro.y / rd.y;
     if(tp > 0.0 && tp < tB){
-      vec2  q = (ro + rd*tp).xz;
-      float d = length(q);
-      float g = 0.0;
-      for(int i=0;i<8;i++) g += 0.0055 / (abs(d - orbR(i)) + 0.016);
-      col += vec3(0.30,0.72,0.95) * g * uPath;
-
-      /* barycentre: the point everything, Sun included, actually orbits */
+      float d = length((ro + rd*tp).xz);
       col += vec3(0.34,0.86,1.00) * (0.0032/(d*d + 0.004)) * uPath;
+    }
+  }
 
-      float belt  = smoothstep(6.4,6.9,d) * (1.0 - smoothstep(8.7,9.2,d));
-      float grain = pow(max(vnoise(vec3(q*4.6, uTime*0.05)) - 0.44, 0.0)*2.5, 2.0);
-      col += vec3(0.60,0.53,0.44) * belt * grain * uBelt * 1.15;
+  /* ---- asteroid belt: volumetric scatter of individually-lit rocks in a thin
+     3D slab around the ecliptic, instead of a flat painted ring. March only the
+     slab the ray actually passes through (bounded by the nearest opaque body,
+     so a planet in front still occludes it), then place a jittered rock per
+     lattice cell — same "grid + local jitter" trick as deepField()'s stars,
+     so no neighbour-cell lookups are needed. */
+  if(uBelt > 0.004){
+    const float BH = 0.34;                          // slab half-thickness
+    float t0, t1;
+    if(abs(rd.y) < 1e-4){
+      t0 = 0.0; t1 = (abs(ro.y) < BH) ? tB : -1.0;
+    } else {
+      float ta = (-BH - ro.y)/rd.y, tb = (BH - ro.y)/rd.y;
+      t0 = max(min(ta,tb), 0.0);
+      t1 = min(max(ta,tb), tB);
+    }
+    if(t1 > t0){
+      const int BSTEPS = 22;
+      float dt = (t1 - t0) / float(BSTEPS);
+      float t  = t0 + dt*h13(vec3(gl_FragCoord.xy, 3.0));   // dither: kills layer banding
+      float occThr = 1.0 - 0.30*clamp(uBelt, 0.0, 2.5);      // denser field at higher uBelt
+      for(int i=0;i<BSTEPS;i++){
+        vec3  p    = ro + rd*t;
+        float rho  = length(p.xz);
+        /* outer fade ends at 8.6, not 9.2: Jupiter's real eccentricity brings its
+           compressed-orbit periapsis down to ~9.2, which used to graze the belt's
+           old outer edge. This keeps a solid ~0.6-unit gap under that periapsis. */
+        float dens = smoothstep(6.4,6.9,rho) * (1.0-smoothstep(8.1,8.6,rho));
+        if(dens > 0.0){
+          vec3 cp   = p * vec3(2.6, 7.0, 2.6);      // flattened lattice: thin in y
+          vec3 cid  = floor(cp);
+          vec3 gv   = fract(cp) - 0.5;
+          vec3 jit  = (h33(cid + 41.7) - 0.5) * 0.86;
+          if(h13(cid + 5.3) > occThr){
+            float rs = mix(0.10, 0.26, h13(cid + 9.1)) * dens;
+            vec3  o  = gv - jit;
+            float d  = length(o);
+            if(d < rs){
+              vec3  n   = normalize(o / vec3(2.6,7.0,2.6));       // unwarp anisotropy back to world dir
+              vec3  L   = normalize(uSunPos - p);
+              float dif = max(dot(n, L), 0.08);
+              col += vec3(0.62,0.55,0.46) * dif * uBelt * 1.3;
+            }
+          }
+        }
+        t += dt;
+      }
     }
   }
 
@@ -1204,7 +1296,7 @@ const S = {
   auto: true, hud: true, quality: 2,
   disk: 1.15, lens: 1.0, spin: 1.0, dopp: 1.0, bloom: 1.05, star: 1.0, jet: 1.0,
   arm: 1.0, dust: 1.0, core: 1.0, hii: 1.0, rot: 1.0,
-  orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 1.0, smark: 1.0,
+  orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 0.0, smark: 1.0,
   scene: 'bh', scale: 0.9, steps: 300,
   focus: -1,            // -1 = whole system, 0..7 = planet, 8 = Sun
   zoomed: false,        // user has zoomed manually: suppress auto re-framing
@@ -1282,15 +1374,29 @@ function resize(){
 const P_AU  = [0.387, 0.723, 1.000, 1.524, 5.203, 9.537, 19.19, 30.07];
 const P_RAD = [0.26,  0.40,  0.42,  0.32,  0.92,  0.80,  0.60,  0.58];
 const P_PH0 = [0.90,  2.30,  0.40,  3.90,  1.60,  5.10,  2.80,  4.40];
+/* real eccentricities/inclinations/nodes — must match ECC/INC/NODE in FS_SS
+   exactly, same reason as the rest of this block: camera focus and
+   click-picking are resolved against this JS copy, so it has to trace the
+   same tilted ellipse. */
+const P_ECC  = [0.2056, 0.0068, 0.0167, 0.0934, 0.0489, 0.0565, 0.0457, 0.0113];
+const P_INC  = [0.12228,0.05926,0.0,    0.03229,0.02275,0.04337,0.01347,0.03087];
+const P_NODE = [0.8436, 1.3384, 0.0,    0.8650, 1.7537, 1.9840, 1.2919, 2.2996];
 const SUN_R = 1.50;
 
 const ORB_RATE = 0.16;          // must match ORB_RATE in FS_SS
 
 function orbR(i){ return 4.6 * Math.pow(P_AU[i], 0.48); }
 function planetPos(i, t){
-  const a = P_PH0[i] + t * Math.pow(P_AU[i], -1.5) * ORB_RATE * S.orbit;
-  const R = orbR(i), inc = 0.014*(i+1);
-  return [Math.cos(a)*R, Math.sin(a)*R*Math.sin(inc), Math.sin(a)*R*Math.cos(inc)];
+  const m  = t * Math.pow(P_AU[i], -1.5) * ORB_RATE * S.orbit;
+  const nu = P_PH0[i] + m;
+  const e  = P_ECC[i];
+  const R  = orbR(i) * (1 - e*e) / (1 + e*Math.cos(m));
+  const cn = Math.cos(P_NODE[i]), sn = Math.sin(P_NODE[i]);
+  const ci = Math.cos(P_INC[i]),  si = Math.sin(P_INC[i]);
+  const cu = Math.cos(nu), su = Math.sin(nu);
+  const ux=cn, uy=0, uz=sn;
+  const wx=-sn*ci, wy=si, wz=cn*ci;
+  return [R*(cu*ux+su*wx), R*(cu*uy+su*wy), R*(cu*uz+su*wz)];
 }
 /* --- the Sun's own orbit about the Solar System barycentre ---
    r_sun = -(Σ mᵢ rᵢ)/M_sun. In reality the Sun–Jupiter barycentre lies about
@@ -1590,7 +1696,7 @@ function reset(){
   const d={ 's-disk':1.15,'s-lens':1,'s-spin':1,'s-jet':1,'s-dopp':1,'s-bloom':1.05,'s-star':1,
             's-arm':1,'s-dust':1,'s-core':1,'s-hii':1,'s-rot':1,
             's-orbit':1,'s-sunl':1,'s-path':1,'s-detail':1,'s-belt':1,
-            's-bary':1,'s-smark':1 };
+            's-bary':0,'s-smark':1 };
   for(const k in d){ $(k).value = d[k]; $(k).dispatchEvent(new Event('input')); }
 }
 window.addEventListener('keydown', e=>{
