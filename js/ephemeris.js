@@ -68,8 +68,11 @@ export function smallBodyPos(au, ecc, inc, node, ph0, t){
   return [R*(cu*cn+su*(-sn*ci)), R*(su*si), R*(cu*sn+su*(cn*ci))];
 }
 /* Ceres/Vesta — must match the CERES_ and VESTA_ consts in FS_SS exactly */
-const CERES_AU=2.77, CERES_ECC=0.076, CERES_INC=0.185, CERES_NODE=1.40, CERES_PH0=1.1, CERES_RAD=0.055;
-const VESTA_AU=2.36, VESTA_ECC=0.089, VESTA_INC=0.124, VESTA_NODE=2.62, VESTA_PH0=4.0, VESTA_RAD=0.042;
+/* RAD here is the mean of the ellipsoid semi-axes in FS_SS's CERES_RAD/
+   VESTA_RAD (vec3) — close enough for pick radius/focus framing, which
+   don't need per-axis precision */
+const CERES_AU=2.77, CERES_ECC=0.076, CERES_INC=0.185, CERES_NODE=1.40, CERES_PH0=1.1, CERES_RAD=0.051;
+const VESTA_AU=2.36, VESTA_ECC=0.089, VESTA_INC=0.124, VESTA_NODE=2.62, VESTA_PH0=4.0, VESTA_RAD=0.039;
 /* Pluto — must match the PLUTO_ consts in FS_SS exactly. Charon (id 21)
    isn't click-focusable — Pluto's barycentre-orbit position stands in for
    both, same as how Sun-focus doesn't track its own tiny wobble either. */

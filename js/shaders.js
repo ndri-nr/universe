@@ -749,15 +749,20 @@ vec3 plutoCharonSurface(vec3 n, int id){
    ellipsoid shape from iEllipsoid()/ellipsoidNormal() above. */
 vec3 asteroidSurface(vec3 n, int id){
   float rough = fbm(n*14.0 + float(id)*9.0);
-  vec3  base  = mix(vec3(0.42,0.39,0.35), vec3(0.62,0.58,0.52), rough);
-  float craters = pow(max(fbm(n*22.0 + 3.0) - 0.58, 0.0) * 2.4, 3.0);
-  base *= 1.0 - craters*0.55;
+  vec3  base  = mix(vec3(0.38,0.35,0.31), vec3(0.62,0.58,0.52), rough);
+  /* two crater scales: a handful of big, dark, obvious pits (what actually
+     reads at a glance) layered under the fine per-pixel roughness */
+  float bigCraters  = pow(max(fbm(n*7.0  + float(id)*23.0) - 0.42, 0.0) * 3.2, 2.2);
+  float fineCraters = pow(max(fbm(n*24.0 + 3.0)            - 0.55, 0.0) * 2.6, 3.0);
+  base *= 1.0 - bigCraters*0.55 - fineCraters*0.35;
   if(id == 24){
     /* Vesta: Rheasilvia, an impact basin large enough to dominate one whole
-       hemisphere in reality — not a subtle crater */
-    vec3  d = n - vec3(0.0,-1.0,0.0);
-    float basin = exp(-dot(d,d) * 2.2);
-    base = mix(base, base*0.55, basin);
+       hemisphere in reality — not a subtle crater. fbm-warped edge so it
+       doesn't read as a perfect radial gradient. */
+    vec3  d = n - vec3(0.0,-1.0,0.15);
+    float wobble = fbm(n*3.0 + 11.0);
+    float basin = exp(-dot(d,d) * (1.8 + wobble*0.8));
+    base = mix(base, base*0.35, basin);
   }
   return base;
 }
@@ -837,8 +842,14 @@ const float VESTA_AU=2.36, VESTA_ECC=0.089, VESTA_INC=0.124, VESTA_NODE=2.62, VE
 /* ellipsoid, not sphere — Ceres is close to round but not quite (a mild
    flattening), Vesta is genuinely lumpy: Rheasilvia, the impact basin at its
    south pole, flattens and widens that whole hemisphere in reality. */
-const vec3  CERES_RAD = vec3(0.055, 0.050, 0.057);
-const vec3  VESTA_RAD = vec3(0.044, 0.036, 0.041);
+/* squash pushed hard — a subtle ellipsoid reads as "still basically a
+   sphere" in a small render; the silhouette itself needs to visibly not be
+   round. Vesta genuinely is this lopsided in reality (Rheasilvia flattens
+   and widens one whole hemisphere); Ceres less so but pushed a bit anyway
+   for legibility, matching the "stylized for visibility" precedent already
+   used elsewhere in this file (moon sizes, BARY_EXAG, etc). */
+const vec3  CERES_RAD = vec3(0.058, 0.044, 0.052);
+const vec3  VESTA_RAD = vec3(0.050, 0.028, 0.038);
 
 vec3 cometPos(){
   float orbRc = 4.6 * pow(COMET_AU, 0.48);
