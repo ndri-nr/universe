@@ -6,23 +6,26 @@
 # build step: the site is static HTML/CSS/ES modules, so this workflow just
 # uploads the repo as-is and deploys it.
 #
-# One manual step is still required if it hasn't been done: in the repo's
-# Settings -> Pages, set "Build and deployment -> Source" to "GitHub Actions".
-# Adding this file alone does not switch a repo off the legacy builder.
+# Settings -> Pages -> "Build and deployment -> Source" is set to "GitHub
+# Actions". That is a repo setting, not something this file can assert: if it
+# ever gets flipped back to "Deploy from a branch", GitHub resumes generating its
+# own `pages-build-deployment` workflow and the two deployers race, which is the
+# failure this whole file exists to end.
 #
-# Observed failure this is tuned against: the build and artifact upload both
-# succeed, then the deploy step polls `deployment_queued` until
-# actions/deploy-pages aborts at its 10-minute default ("Timeout reached,
-# aborting!"). Nothing about the site's contents or file layout is involved —
-# the artifact exists by then. The run that last succeeded showed the same
-# queueing and simply outlasted it, which is why the timeouts here are generous.
+# The failure, for the record: build and artifact upload always succeeded, then
+# the deploy step polled `deployment_queued` until it gave up ("Timeout reached,
+# aborting!" / "Deployment failed, try again later"). Nothing to do with the
+# site's contents or file layout — the artifact existed by then. deploy-pages
+# polls the deployment IT created, and Pages promotes one deployment at a time,
+# so the deployer that lost the race waited on something that would never be
+# promoted. The site would go live from the winner while the loser's run sat
+# spinning. Raising the timeout does not help that; only removing the second
+# deployer does.
 #
-# Note the legacy source's built-in workflow calls this same action, so a queue
-# stall is not something switching source fixes by itself. If it still recurs
-# after this, the cause is upstream of this file: check Settings -> Environments
-# -> github-pages for a protection rule (a required reviewer or wait timer
-# leaves deployments queued until they expire), look for an earlier deployment
-# stuck in progress holding the pipeline, then githubstatus.com.
+# If a queue stall somehow recurs with a single deployer, the cause is upstream
+# of this file: check Settings -> Environments -> github-pages for a protection
+# rule (a required reviewer or wait timer leaves deployments queued until they
+# expire), then githubstatus.com.
 name: Deploy Pages
 
 on:
@@ -35,13 +38,13 @@ permissions:
   pages: write
   id-token: write
 
-# cancel-in-progress is true here, against the usual advice for Pages. The
-# standard reason to keep it false is to let a real production deploy finish —
-# but the failure being fixed is a run wedged in the queue, and a wedged run
-# with cancel-in-progress: false blocks every later attempt behind it.
+# Queue later pushes behind an in-flight deploy rather than cancelling it. This
+# was briefly true, to stop a run wedged by the two-deployer race from blocking
+# everything behind it; with a single deployer there is nothing to wedge it, and
+# killing a real production deploy midway is the worse trade.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:

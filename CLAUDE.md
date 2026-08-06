@@ -16,7 +16,9 @@ python -m http.server 8000   # then open http://localhost:8000
 
 There's no CLI dev loop — verify changes by reloading in-browser and watching the canvas + telemetry HUD. If `run` skill is available, use it to launch and screenshot.
 
-GitHub Pages deploys from `.github/workflows/pages.yml` on push to `main` — a plain upload-artifact/deploy-pages pair, no build step. It replaced the legacy branch build, which ran Jekyll over the tree for no reason and started failing; `.nojekyll` is kept as belt-and-braces. If Pages ever silently serves a stale site, check that Settings -> Pages -> Source is still "GitHub Actions".
+GitHub Pages deploys from `.github/workflows/pages.yml` on push to `main` — a plain upload-artifact/deploy-pages pair, no build step. It replaced the legacy branch build, which ran Jekyll over the tree for no reason; `.nojekyll` is kept as belt-and-braces.
+
+**Pages source must stay "GitHub Actions"** (Settings → Pages → Build and deployment). On "Deploy from a branch", GitHub generates its own `pages-build-deployment` workflow, so two deployers race for the one Pages deployment slot: the winner goes live, and the loser polls a deployment that will never be promoted until it times out. Symptom is a run stuck on `deployment_queued` / "Deployment failed, try again later" while the site is already current. That cost a long debugging session — see the header of `pages.yml` for the full write-up before touching the deploy again.
 
 ## Architecture
 
