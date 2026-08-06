@@ -16,7 +16,7 @@ Roadmap, in working order. Check items off as shipped.
 - [x] Comet with dust + ion tail, always pointing away from Sun, on a wildly eccentric orbit
 - [x] Earth day/night terminator + city lights on the dark side
 - [ ] Clickable notable asteroids in the belt (Ceres, Vesta) — shape/texture done (ellipsoid + craters + Vesta's Rheasilvia basin), click-focus wired, but still reads as "small smooth moon" not "asteroid" at normal zoom. Cheap fix tried first: exaggerate ellipsoid squash + crater contrast. If still not enough, real fix is a small raymarched SDF for just these two (this scene is otherwise analytic-only, no march loop) — don't start until asked.
-- [ ] Make Saturn's rings more realistic
+- [x] Make Saturn's rings more realistic (real band structure + ring shadow on the globe)
 - [x] Make Pluto clickable (also added its orbit ring)
 
 ## 4. New scene tab
