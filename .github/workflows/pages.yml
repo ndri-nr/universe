@@ -90,17 +90,19 @@ jobs:
         with:
           timeout: 300000
           error_count: 20
-          reporting_interval: 15000
+          reporting_interval: 5000
 
       # Status-aware wait, which deploy-pages cannot do: it has one flat timeout
       # for every state, but the two states mean different things here.
       #   deployment_queued      — Pages has not started. Genuinely worth waiting
-      #                            out, so allow the full 15 minutes.
+      #                            out, so allow the full 15 minutes: 180 polls
+      #                            at the 5s interval used throughout.
       #   deployment_in_progress — Pages accepted it and is rolling out; the
       #                            content usually lands well before the record
       #                            flips to `succeed`, and in this repo it often
-      #                            never flips at all. Ten polls (2.5 min) is
-      #                            plenty, then hand over to the live-site check.
+      #                            never flips at all. Ten polls is the agreed
+      #                            budget, which at 5s is 50 seconds, then hand
+      #                            over to the live-site check.
       # The deployment id is just the commit SHA — that is what deploy-pages logs
       # as "Created deployment for <sha>, ID: <sha>" — so the status URL needs no
       # output threaded out of the step above.
@@ -110,7 +112,7 @@ jobs:
         run: |
           api="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/deployment/status/${GITHUB_SHA}"
           inprog=0; waited=0
-          for i in $(seq 1 60); do
+          for i in $(seq 1 180); do
             st=$(curl -fsS --max-time 20 \
                    -H "Authorization: Bearer ${GH_TOKEN}" \
                    -H "Accept: application/vnd.github+json" "$api" 2>/dev/null \
@@ -119,11 +121,11 @@ jobs:
             echo "status: ${st:-unreadable}"
             case "$st" in
               succeed)
-                echo "record reached succeed after ~$((i*15))s"; exit 0 ;;
+                echo "record reached succeed after ~$((i*5))s"; exit 0 ;;
               deployment_in_progress)
                 inprog=$((inprog+1))
                 if [ "$inprog" -ge 10 ]; then
-                  echo "in_progress for 10 polls — not waiting further, the live-site check decides"
+                  echo "in_progress for 10 polls (~50s) — not waiting further, the live-site check decides"
                   exit 0
                 fi ;;
               deployment_failed|deployment_content_failed|deployment_cancelled|deployment_lost)
@@ -131,12 +133,12 @@ jobs:
               *)
                 # queued, or the status could not be read; both just wait
                 waited=$((waited+1))
-                if [ "$waited" -ge 60 ]; then
+                if [ "$waited" -ge 180 ]; then
                   echo "still not started after 15 min — the live-site check decides"
                   exit 0
                 fi ;;
             esac
-            sleep 15
+            sleep 5
           done
 
       # The actual success condition: the live site serves THIS commit. That is
@@ -147,13 +149,13 @@ jobs:
           url="${{ steps.deployment.outputs.page_url }}"
           url="${url:-https://ndri-nr.github.io/universe/}"
           echo "checking ${url}_commit.txt for ${GITHUB_SHA}"
-          for i in $(seq 1 40); do
+          for i in $(seq 1 120); do
             got=$(curl -fsS --max-time 20 "${url}_commit.txt" 2>/dev/null | tr -d "[:space:]" || true)
             if [ "$got" = "$GITHUB_SHA" ]; then
-              echo "live after ~$((i*15))s"
+              echo "live after ~$((i*5))s"
               exit 0
             fi
-            sleep 15
+            sleep 5
           done
           echo "::error::site never served ${GITHUB_SHA} (last saw \"${got:-nothing}\")"
           exit 1
