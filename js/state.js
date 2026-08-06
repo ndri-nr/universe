@@ -15,6 +15,7 @@ export const S = {
   arm: 1.0, dust: 1.0, core: 1.0, hii: 1.0, rot: 1.0,
   orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 0.0, smark: 1.0,
   psSpin: 1.0, psBeam: 1.0, psMag: 1.0, psTilt: 0.65,
+  nbDensity: 1.0, nbProto: 1.0, nbJet: 1.0,
   scene: 'bh', scale: 0.9, steps: 300,
   focus: -1,            // -1 = whole system, 0..7 = planet, 8 = Sun
   zoomed: false,        // user has zoomed manually: suppress auto re-framing
@@ -75,6 +76,19 @@ export const SCENES = {
         +'◆ MAGNETIC AXIS OBLIQUE TO SPIN AXIS — THE OBLIQUE ROTATOR IS WHY IT PULSES AT ALL '
         +'◆ LIGHT CYLINDER RADIUS 5,480 km ◆ TWIN LIGHTHOUSE BEAMS ALONG THE MAGNETIC POLES '
         +'◆ DISPERSION MEASURE 116.5 pc·cm&#8315;&sup3; ◆ CLASSIFIED: ROTATION-POWERED PULSAR ◆'
+  },
+  nb: {
+    dist: 20.0, pitch: 0.30, min: 4.0, max: 40,
+    lbl: 'infrared survey // node-07',
+    h1:  'NGC 6611-B',
+    sub: 'H II EMISSION NEBULA &middot; 5 PROTOSTARS &middot; R &asymp; 26 pc',
+    rlbl:'OBS RADIUS', runit:' pc', slbl:'MARCH STEPS',
+    meters:['CLOUD DENSITY','PROTOSTAR LUMINOSITY','JET ACTIVITY',
+            'DUST EXTINCTION','BACKGROUND NOISE'],
+    tick:'◆ INFRARED SURVEY ONLINE ◆ STELLAR NURSERY · 5 PROTOSTARS CATALOGUED ◆ H-ALPHA / OIII DUAL BAND '
+        +'◆ DUST LANES ABSORBING VISIBLE LIGHT ◆ BIPOLAR JETS ALONG ACCRETION AXES ◆ '
+        +'GRAVITATIONAL COLLAPSE ONGOING &middot; FUTURE OB ASSOCIATION ◆ '
+        +'RADIATION PRESSURE SCULPTING PILLARS ◆ CLASSIFIED: DIFFUSE EMISSION NEBULA ◆'
   }
 };
 

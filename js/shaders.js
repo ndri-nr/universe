@@ -1250,6 +1250,118 @@ void main(){
   outColor = vec4(max(col, 0.0), 1.0);
 }`;
 
+/* ============================ SCENE E: NEBULA / STELLAR NURSERY =============
+   Bounded volumetric march, same shape as the Milky Way/pulsar scenes.
+   Billowy turbulent gas+dust with two emission populations (H-alpha
+   red/pink where dense, OIII teal in the more ionized diffuse wisps) and a
+   handful of embedded protostars, two with bipolar outflow jets — a small
+   version of the black hole scene's jet technique, minus any lensing. */
+export const FS_NEBULA = GLSL_HEAD + `
+uniform float uDensity, uProto, uJet;
+
+const float R_HALO = 26.0;
+const int   PROTO_N = 5;
+const vec3  PROTO_POS[5] = vec3[5](
+  vec3( 3.2, 1.1,-2.0),
+  vec3(-4.5,-0.6, 3.1),
+  vec3( 1.0,-2.4,-4.8),
+  vec3(-2.0, 2.8, 1.5),
+  vec3( 5.5, 0.2, 2.2)
+);
+const float PROTO_RAD[5] = float[5](0.35, 0.22, 0.28, 0.18, 0.40);
+
+/* bipolar jet from one protostar — density-only, straight axis (no lensing
+   needed, unlike the black hole's relativistic jet this is copied from) */
+vec3 protoJet(vec3 p, vec3 starPos, float rad, float axisSeed){
+  vec3  rel  = p - starPos;
+  vec3  axis = normalize(vec3(sin(axisSeed), 1.6, cos(axisSeed*1.7)));
+  float along = dot(rel, axis);
+  vec3  perp  = rel - axis*along;
+  float pr = length(perp);
+  float rj = rad*0.5 + abs(along)*0.06;
+  if(pr > rj*1.8) return vec3(0.0);
+  float lon  = smoothstep(rad*0.6, rad*2.0, abs(along)) * exp(-abs(along)*0.10);
+  float turb = 0.5 + 0.6*vnoise(perp*3.0 + vec3(0.0, 0.0, along*0.4 - uTime*0.6));
+  float dens = exp(-pr*pr/(rj*rj)*2.0) * lon * turb;
+  return vec3(0.55,0.70,1.4) * dens;
+}
+
+/* emission at p; also returns the local absorption coefficient */
+vec3 nebulaEmit(vec3 p, out float ab){
+  ab = 0.0;
+  float r = length(p);
+  if(r > R_HALO) return vec3(0.0);
+
+  /* billowy turbulent structure at three scales */
+  float n1 = fbm(p*0.16 + vec3(0.0, uTime*0.006, 0.0));
+  float n2 = fbm(p*0.42 + 11.0);
+  float n3 = fbm(p*1.10 + 23.0 - vec3(0.0, uTime*0.010, 0.0));
+  float shape = smoothstep(0.30, 0.95, n1) * (0.4 + 0.9*n2);
+  float dens  = shape * (0.35 + 0.85*pow(n3,1.4)) * smoothstep(R_HALO, R_HALO*0.55, r);
+  dens *= uDensity;
+
+  /* two emission populations blended by a slower, larger-scale noise so it
+     reads as broad colour regions rather than static per-voxel noise */
+  float colorNoise = fbm(p*0.09 + 41.0 + vec3(0.0, uTime*0.004, 0.0));
+  vec3  haCol   = vec3(1.15,0.28,0.42);   // H-alpha: dense, ionized hydrogen
+  vec3  oiiiCol = vec3(0.25,0.85,0.95);   // OIII: diffuse, hot young stars
+  vec3  baseCol = mix(oiiiCol, haCol, smoothstep(0.35,0.65,colorNoise));
+
+  /* dust lanes: dense knots that absorb rather than emit, carving dark
+     silhouettes through the bright cloud — Pillars-of-Creation style */
+  float dust = pow(max(n3-0.55, 0.0) * 2.2, 2.0) * shape;
+
+  vec3 col = baseCol * dens * (1.0 - dust*0.7) * 1.5;
+  ab = dens*0.50 + dust*0.85;
+
+  /* protostars: bright cores embedded in the cloud. ab includes their core
+     too — same lesson as the pulsar scene's surface fix, a bright emitter
+     needs absorption of its own or the march just re-adds it every step */
+  for(int i=0;i<PROTO_N;i++){
+    float d    = length(p - PROTO_POS[i]);
+    float core = exp(-d*d/(PROTO_RAD[i]*PROTO_RAD[i]) * 3.0);
+    col += vec3(1.6,1.5,1.8) * core * uProto * 1.8;
+    ab  += core * 0.9;
+  }
+  col += protoJet(p, PROTO_POS[0], PROTO_RAD[0], 0.4) * uJet;
+  col += protoJet(p, PROTO_POS[4], PROTO_RAD[4], 2.6) * uJet;
+
+  return col;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*uRes) / uRes.y;
+  vec3 rd = normalize(uCamMat * vec3(uv, -1.45));
+
+  vec3  col   = vec3(0.0);
+  float trans = 1.0;
+
+  float b    = dot(uCam, rd);
+  float cc   = dot(uCam, uCam) - R_HALO*R_HALO;
+  float disc = b*b - cc;
+  if(disc > 0.0){
+    float sq = sqrt(disc);
+    float t0 = max(-b - sq, 0.0);
+    float t1 = -b + sq;
+    int   ns = min(uSteps, 260);
+    float dt = (t1 - t0) / float(ns);
+    float jit = h13(vec3(gl_FragCoord.xy, floor(uTime*24.0)));
+    float t = t0 + dt*jit;
+    for(int i=0;i<MAXS;i++){
+      if(i >= ns || trans < 0.003) break;
+      float ab;
+      float d2 = h13(vec3(gl_FragCoord.xy, float(i) + jit*13.0)) - 0.5;
+      vec3 em = nebulaEmit(uCam + rd*(t + dt*d2*0.9), ab);
+      col   += trans * em * dt;
+      trans *= exp(-ab*dt);
+      t     += dt;
+    }
+  }
+
+  col += trans * deepField(rd);
+  outColor = vec4(max(col, 0.0), 1.0);
+}`;
+
 /* ---------------- post-processing passes ---------------- */
 export const FS_BRIGHT = `#version 300 es
 precision highp float;

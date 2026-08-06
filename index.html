@@ -54,6 +54,8 @@
             PLANETS</span></button>
         <button class="navb" data-go="ps"><span class="full">◈ PULSAR</span><span class="abbr">◈
             PULSAR</span></button>
+        <button class="navb" data-go="nb"><span class="full">◈ NEBULA</span><span class="abbr">◈
+            NEBULA</span></button>
       </div>
 
       <div id="bodies" class="panel" data-sc="ss">
@@ -120,6 +122,10 @@
           <div class="row" data-sc="ps"><span>MAGNETIC OBLIQUITY</span><b id="ps-o">0</b></div>
           <div class="row" data-sc="ps"><span>LIGHT CYLINDER</span><b id="ps-l">0</b></div>
           <div class="row" data-sc="ps"><span>BEAM PHASE</span><b id="ps-b">0</b></div>
+          <div class="row" data-sc="nb"><span>CLOUD DENSITY</span><b id="nb-d">0</b></div>
+          <div class="row" data-sc="nb"><span>ACTIVE PROTOSTARS</span><b id="nb-p">0</b></div>
+          <div class="row" data-sc="nb"><span>JET STATE</span><b id="nb-j">0</b></div>
+          <div class="row" data-sc="nb"><span>NEAREST PROTOSTAR</span><b id="nb-n">0</b></div>
           <div class="row"><span id="t-sl">PHOTON STEPS</span><b id="t-s">0</b></div>
           <div class="row"><span>RENDER</span><b id="t-p">0</b></div>
           <div class="row"><span>FRAME RATE</span><b id="t-f">0</b></div>
@@ -237,6 +243,16 @@
       </div>
       <div class="ctl" data-sc="ps"><label>MAGNETIC OBLIQUITY <var id="v-pstilt">0.65</var></label>
         <input id="s-pstilt" type="range" min="0" max="1.57" step="0.01" value="0.65">
+      </div>
+
+      <div class="ctl" data-sc="nb"><label>CLOUD DENSITY <var id="v-nbdensity">1.00</var></label>
+        <input id="s-nbdensity" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="nb"><label>PROTOSTAR BRIGHTNESS <var id="v-nbproto">1.00</var></label>
+        <input id="s-nbproto" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="nb"><label>JET INTENSITY <var id="v-nbjet">1.00</var></label>
+        <input id="s-nbjet" type="range" min="0" max="2.5" step="0.01" value="1">
       </div>
 
       <div class="ctl"><label>BLOOM / GLOW <var id="v-bloom">1.00</var></label>

@@ -27,6 +27,7 @@ export function updateHud(t, RW, RH, fps){
   const m = (S.scene === 'mw') ? hudGalaxy(t, r)
           : (S.scene === 'ss') ? hudSolar(t, r)
           : (S.scene === 'ps') ? hudPulsar(t, r)
+          : (S.scene === 'nb') ? hudNebula(t, r)
           : hudHole(t, r);
   for(let i=0;i<5;i++){
     const v = Math.max(0, Math.min(100, m[i]));
@@ -133,6 +134,33 @@ function hudPulsar(t, r){
     S.psMag*36 + 7*Math.sin(t*1.6),
     S.psSpin*44 + 6*Math.sin(t*2.2),
     (S.psTilt/1.57)*100,
+    10 + 8*Math.abs(Math.sin(t*0.6))
+  ];
+}
+
+/* --- Nebula readouts. No body-select panel here (protostars aren't click-
+   focusable), so unlike hudSolar/hudPulsar these numbers describe the whole
+   cloud rather than a tracked body — NEAREST PROTOSTAR uses the closest of
+   the 5 fixed PROTO_POS entries baked into FS_NEBULA (nearest is index 0,
+   |pos| ≈ 3.93 pc from the cloud centre). --- */
+function hudNebula(t, r){
+  $('nb-d').textContent = (0.55*S.nbDensity + 0.10*Math.sin(t*0.4)).toFixed(2);
+  const active = S.nbProto > 0.03 ? 5 : 0;
+  $('nb-p').textContent = active + ' / 5';
+  const je = $('nb-j');
+  if(S.nbJet < 0.02){ je.textContent = 'DORMANT'; je.className = ''; }
+  else { je.textContent = 'BIPOLAR ACTIVE'; je.className = 'warn'; }
+  $('nb-n').textContent = (3.93 + 0.4*Math.sin(t*0.25)).toFixed(2) + ' pc';
+
+  const link = $('t-l');
+  if(r < 6){ link.textContent = 'IN CLOUD CORE'; link.className = 'warn'; }
+  else { link.textContent = 'STABLE'; link.className = ''; }
+
+  return [
+    S.nbDensity*40 + 8*Math.sin(t*0.8),
+    S.nbProto*42 + 7*Math.sin(t*1.4+0.3),
+    S.nbJet*36 + 9*Math.abs(Math.sin(t*2.0)),
+    30 + 10*Math.sin(t*0.5+1.1),
     10 + 8*Math.abs(Math.sin(t*0.6))
   ];
 }
