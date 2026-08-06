@@ -491,7 +491,7 @@ void main(){
 
   col += satBlob(rd, normalize(vec3( 0.58,-0.34, 0.74)), 0.075, vec3(0.80,0.84,0.98), 6.0, 0.85) * trans; // LMC
   col += satBlob(rd, normalize(vec3( 0.52,-0.30, 0.80)), 0.045, vec3(0.78,0.82,0.95), 7.0, 0.55) * trans; // SMC
-  col += satBlob(rd, normalize(vec3(-0.55, 0.40,-0.73)), 0.100, vec3(0.92,0.86,0.78), 5.0, 0.42) * trans; // M31
+  col += satBlob(rd, normalize(vec3(-0.739,-0.330,-0.587)), 0.085, vec3(0.92,0.86,0.78), 5.0, 0.65) * trans; // M31
 
   col += trans * deepField(rd);
   outColor = vec4(max(col, 0.0), 1.0);
