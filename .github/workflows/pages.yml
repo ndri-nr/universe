@@ -10,16 +10,19 @@
 # Settings -> Pages, set "Build and deployment -> Source" to "GitHub Actions".
 # Adding this file alone does not switch a repo off the legacy builder.
 #
-# Observed failure this is tuned against: the deploy step sat in
-# `deployment_queued` and aborted at actions/deploy-pages' 10-minute default
-# ("Timeout reached, aborting!"). The Jekyll build itself was fine — it is the
-# deployment that never leaves the queue. Note the legacy source's built-in
-# workflow uses this same action, so a queue stall is NOT fixed by switching
-# source; if it recurs, the cause is upstream of this file. In order of
-# likelihood: a protection rule on the `github-pages` environment (a required
-# reviewer or wait timer leaves deployments queued until they expire), an
-# earlier deployment stuck in progress holding the pipeline, or a GitHub
-# incident. Check Settings -> Environments -> github-pages first.
+# Observed failure this is tuned against: the build and artifact upload both
+# succeed, then the deploy step polls `deployment_queued` until
+# actions/deploy-pages aborts at its 10-minute default ("Timeout reached,
+# aborting!"). Nothing about the site's contents or file layout is involved —
+# the artifact exists by then. The run that last succeeded showed the same
+# queueing and simply outlasted it, which is why the timeouts here are generous.
+#
+# Note the legacy source's built-in workflow calls this same action, so a queue
+# stall is not something switching source fixes by itself. If it still recurs
+# after this, the cause is upstream of this file: check Settings -> Environments
+# -> github-pages for a protection rule (a required reviewer or wait timer
+# leaves deployments queued until they expire), look for an earlier deployment
+# stuck in progress holding the pipeline, then githubstatus.com.
 name: Deploy Pages
 
 on:
@@ -43,23 +46,30 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # a queued deploy that is going to hang should give up in half an hour, not
-    # sit on a runner for the 6-hour job default
-    timeout-minutes: 30
+    # must exceed the deploy-pages timeout below, or the job is killed before the
+    # action gets to report anything useful
+    timeout-minutes: 55
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # current majors as of this commit. The last deployment of this repo that
+      # actually succeeded ran deploy-pages@v5, so do not pin these back to v4/v3
+      # without a reason — v4 was a major behind and is the one that kept aborting.
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: .
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         with:
-          # 25 min instead of the 10 min default. Does not fix a permanently
-          # stuck queue, but Pages queues can genuinely run long, and the
-          # previous failures aborted at exactly the default.
-          timeout: 1500000
+          # 45 min against a 10 min default. The run that succeeded also polled
+          # `deployment_queued` repeatedly, so a slow queue is normal here rather
+          # than a fault — every failure aborted at exactly the default, which
+          # means the wait was too short, not that the deploy was dead.
+          timeout: 2700000
           error_count: 20
+          # poll every 15s rather than 5s: at a 45 min ceiling the default fills
+          # the log with hundreds of identical status lines
+          reporting_interval: 15000
