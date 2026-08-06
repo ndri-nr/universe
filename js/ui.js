@@ -6,7 +6,7 @@
    entry in SCENES (state.js); any scene-only controls use data-sc="name" and
    are already handled by the CSS in style.css. */
 import { S, SCENES, QUALITY, setDragging } from './state.js';
-import { bodyPos, bodyRad, FACTS, SUN_FACT, CERES_FACT, VESTA_FACT, slugFor, idForSlug } from './ephemeris.js';
+import { bodyPos, bodyRad, FACTS, SUN_FACT, CERES_FACT, VESTA_FACT, PLUTO_FACT, slugFor, idForSlug } from './ephemeris.js';
 import { canvas } from './gl.js';
 import { resize, applyQuality, VIEW, setAutoCap, resetGood } from './render.js';
 
@@ -56,7 +56,7 @@ function pick(cx, cy){
     uvx*VIEW.r[2] + uvy*VIEW.u[2] + 1.45*VIEW.f[2]
   ]);
   let best = Infinity, hit = null;
-  const PICK_IDS = [0,1,2,3,4,5,6,7,8,23,24];
+  const PICK_IDS = [0,1,2,3,4,5,6,7,8,20,23,24];
   for(const id of PICK_IDS){
     const c = bodyPos(id, VIEW.t);
     /* generous pick radius: distant planets are only a few pixels wide */
@@ -177,10 +177,13 @@ export function setFocus(id){
       $('ti-h1').textContent = 'SOLAR SYSTEM';
       $('ti-sub').innerHTML  = SCENES.ss.sub;
     } else {
-      const F = (id === 8) ? SUN_FACT : (id === 23) ? CERES_FACT : (id === 24) ? VESTA_FACT : FACTS[id];
+      const F = (id === 8) ? SUN_FACT : (id === 20) ? PLUTO_FACT
+              : (id === 23) ? CERES_FACT : (id === 24) ? VESTA_FACT : FACTS[id];
       $('ti-h1').textContent = F.n;
       $('ti-sub').innerHTML  = (id === 8)
         ? 'G2V PRIMARY &middot; 8 PLANETS &middot; R = 696,340 km'
+        : (id === 20)
+        ? 'DWARF PLANET &middot; a = ' + F.a + ' &middot; binary with Charon'
         : (id === 23 || id === 24)
         ? 'ASTEROID BELT &middot; a = ' + F.a + ' &middot; d = ' + F.d
         : 'PLANET ' + (id+1) + ' of 8 &middot; a = ' + F.a + ' &middot; '
@@ -196,7 +199,7 @@ export function setFocus(id){
     /* 54 deg phase angle, as an offset in the sun-relative frame (see frame()).
        Not shallower: for Mercury and Venus the camera sits only 1-2 units out,
        and a small angle parks it almost against the Sun's surface. */
-    if(id < 8 || id === 23 || id === 24) S.tYaw = 0.95;
+    if(id < 8 || id === 20 || id === 23 || id === 24) S.tYaw = 0.95;
   }
   publishState();
 }
@@ -205,7 +208,7 @@ document.querySelectorAll('.bb[data-b]').forEach(b => b.onclick = ()=> setFocus(
 /* ---------------- prev/next body cycling ----------------
    Keyboard arrows and the PREV/NEXT chips both drive this — the arrows are
    desktop-only, the on-screen buttons are what a touch user actually has. */
-const FOCUS_ORDER = [-1, 8, 0,1,2,3, 23,24, 4,5,6,7];   // FULL SYSTEM, SUN, MERCURY..MARS, CERES/VESTA, JUPITER..NEPTUNE
+const FOCUS_ORDER = [-1, 8, 0,1,2,3, 23,24, 4,5,6,7, 20];   // FULL SYSTEM, SUN, MERCURY..MARS, CERES/VESTA, JUPITER..NEPTUNE, PLUTO
 function cycleFocus(dir){
   if(S.scene !== 'ss') return;
   const idx = FOCUS_ORDER.indexOf(S.focus);
@@ -227,7 +230,8 @@ function publishState(){
 
   let subject = SCENES[S.scene].h1;
   if(S.scene === 'ss' && S.focus >= 0){
-    const F = (S.focus === 8) ? SUN_FACT : (S.focus === 23) ? CERES_FACT : (S.focus === 24) ? VESTA_FACT : FACTS[S.focus];
+    const F = (S.focus === 8) ? SUN_FACT : (S.focus === 20) ? PLUTO_FACT
+            : (S.focus === 23) ? CERES_FACT : (S.focus === 24) ? VESTA_FACT : FACTS[S.focus];
     subject = F.n + ' · SOLAR SYSTEM';
   }
   document.title = subject + ' | SINGULARITY OBSERVATORY';

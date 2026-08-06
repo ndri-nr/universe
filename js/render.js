@@ -95,7 +95,7 @@ export function frame(now){
      the planet orbits — Mercury laps in 9.5 s, so within seconds the intended
      54 deg phase angle had drifted to 142 deg and the camera was staring into
      the Sun with the planet in silhouette. Co-rotating the frame pins the phase. */
-  const sunRel = tracking && (S.focus < 8 || S.focus === 23 || S.focus === 24);
+  const sunRel = tracking && (S.focus < 8 || S.focus === 20 || S.focus === 23 || S.focus === 24);
   const yaw = sunRel ? Math.atan2(-want[0], -want[2]) + S.yaw : S.yaw;
 
   const cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);

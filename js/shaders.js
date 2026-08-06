@@ -1010,6 +1010,28 @@ void main(){
         }
       }
     }
+    /* Pluto's own ring, same technique, own plane/ellipse — it isn't one of
+       the 8 planets above (own AU/ECC/INC/NODE consts entirely) */
+    {
+      float cn = cos(PLUTO_NODE), sn = sin(PLUTO_NODE);
+      float ci = cos(PLUTO_INC),  si = sin(PLUTO_INC);
+      vec3  u  = vec3(cn, 0.0, sn);
+      vec3  w  = vec3(-sn*ci, si, cn*ci);
+      vec3  ni = cross(u, w);
+      float dn = dot(rd, ni);
+      if(abs(dn) > 1e-5){
+        float t = -dot(ro, ni) / dn;
+        if(t > 0.0 && t < tB){
+          vec3  p   = ro + rd*t;
+          float lu  = dot(p, u), lw = dot(p, w);
+          float ang = atan(lw, lu);
+          float rho = length(vec2(lu, lw));
+          float orbRp = 4.6 * pow(PLUTO_AU, 0.48);
+          float ex  = orbRp * (1.0 - PLUTO_ECC*PLUTO_ECC) / (1.0 + PLUTO_ECC*cos(ang - PLUTO_PH0));
+          g += 0.0055 / (abs(rho - ex) + 0.016);
+        }
+      }
+    }
     col += vec3(0.30,0.72,0.95) * g * uPath;
   }
 

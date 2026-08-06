@@ -70,15 +70,25 @@ export function smallBodyPos(au, ecc, inc, node, ph0, t){
 /* Ceres/Vesta — must match the CERES_ and VESTA_ consts in FS_SS exactly */
 const CERES_AU=2.77, CERES_ECC=0.076, CERES_INC=0.185, CERES_NODE=1.40, CERES_PH0=1.1, CERES_RAD=0.055;
 const VESTA_AU=2.36, VESTA_ECC=0.089, VESTA_INC=0.124, VESTA_NODE=2.62, VESTA_PH0=4.0, VESTA_RAD=0.042;
+/* Pluto — must match the PLUTO_ consts in FS_SS exactly. Charon (id 21)
+   isn't click-focusable — Pluto's barycentre-orbit position stands in for
+   both, same as how Sun-focus doesn't track its own tiny wobble either. */
+const PLUTO_AU=39.5, PLUTO_ECC=0.248, PLUTO_INC=0.2995, PLUTO_NODE=1.925, PLUTO_PH0=2.0, PLUTO_RAD=0.10;
+
+export function plutoBaryPos(t){
+  return smallBodyPos(PLUTO_AU, PLUTO_ECC, PLUTO_INC, PLUTO_NODE, PLUTO_PH0, t);
+}
 
 export function bodyPos(id, t){
   if(id === 8)  return sunPos(t);
+  if(id === 20) return plutoBaryPos(t);
   if(id === 23) return smallBodyPos(CERES_AU, CERES_ECC, CERES_INC, CERES_NODE, CERES_PH0, t);
   if(id === 24) return smallBodyPos(VESTA_AU, VESTA_ECC, VESTA_INC, VESTA_NODE, VESTA_PH0, t);
   return planetPos(id, t);
 }
 export function bodyRad(id){
   if(id === 8)  return SUN_R;
+  if(id === 20) return PLUTO_RAD;
   if(id === 23) return CERES_RAD;
   if(id === 24) return VESTA_RAD;
   return P_RAD[id];
@@ -103,6 +113,8 @@ export const CERES_FACT = {n:'CERES', d:'940 km', m:'0.00016 M⊕', g:'0.27 m/s�
                   day:'9.07 h', yr:'4.60 yr', mo:'0', T:'−105 °C', a:'2.77 AU'};
 export const VESTA_FACT = {n:'VESTA', d:'525 km', m:'0.00004 M⊕', g:'0.25 m/s²',
                   day:'5.34 h', yr:'3.63 yr', mo:'0', T:'−96 °C',  a:'2.36 AU'};
+export const PLUTO_FACT = {n:'PLUTO', d:'2,377 km', m:'0.0022 M⊕', g:'0.62 m/s²',
+                  day:'6.39 d', yr:'248 yr', mo:'5', T:'−229 °C', a:'39.5 AU'};
 
 /* ---------------- deep links ----------------
    #bh, #mw, #ss, #ss/saturn — the body slug lives here since it's really part
@@ -110,12 +122,14 @@ export const VESTA_FACT = {n:'VESTA', d:'525 km', m:'0.00004 M⊕', g:'0.25 m/s�
 export const BODY_SLUG = ['mercury','venus','earth','mars','jupiter','saturn','uranus','neptune'];
 export function slugFor(id){
   if(id === 8)  return 'sun';
+  if(id === 20) return 'pluto';
   if(id === 23) return 'ceres';
   if(id === 24) return 'vesta';
   return id >= 0 ? BODY_SLUG[id] : null;
 }
 export function idForSlug(s){
   if(s === 'sun')   return 8;
+  if(s === 'pluto') return 20;
   if(s === 'ceres') return 23;
   if(s === 'vesta') return 24;
   const i = BODY_SLUG.indexOf(s);
