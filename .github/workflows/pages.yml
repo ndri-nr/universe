@@ -51,7 +51,9 @@ jobs:
     timeout-minutes: 55
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # fall through to the retry's output, or the URL is blank whenever the
+      # first attempt was the one that lost the race
+      url: ${{ steps.deployment.outputs.page_url || steps.retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       # current majors as of this commit. The last deployment of this repo that
@@ -62,6 +64,7 @@ jobs:
         with:
           path: .
       - id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v5
         with:
           # 45 min against a 10 min default. The run that succeeded also polled
@@ -72,4 +75,17 @@ jobs:
           error_count: 20
           # poll every 15s rather than 5s: at a 45 min ceiling the default fills
           # the log with hundreds of identical status lines
+          reporting_interval: 15000
+
+      # One retry. Actions has no native step retry, hence continue-on-error on
+      # the attempt above plus this conditional second go. The artifact is still
+      # attached to this run, so it does not need re-uploading. Worth having
+      # because the observed error is literally "Deployment failed, try again
+      # later" — a queued deployment that lost a race, not a broken build.
+      - id: retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v5
+        with:
+          timeout: 2700000
+          error_count: 20
           reporting_interval: 15000
