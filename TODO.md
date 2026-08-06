@@ -20,7 +20,7 @@ Roadmap, in working order. Check items off as shipped.
 - [x] Make Pluto clickable (also added its orbit ring)
 
 ## 4. New scene tab
-- [ ] Neutron star / pulsar — beamed lighthouse jets, magnetosphere
+- [x] Neutron star / pulsar — beamed lighthouse jets, magnetosphere
 - [ ] Exoplanet system — transit method visual, habitable zone band
 - [ ] Nebula / stellar nursery — protostars forming
 
