@@ -3,7 +3,7 @@
 Roadmap, in working order. Check items off as shipped.
 
 ## 1. Black hole scene
-- [ ] Binary black hole merger — second Schwarzschild horizon, orbiting, combined/mutual gravitational lensing (dual photon rings)
+- [x] Binary black hole merger — second Schwarzschild horizon, orbiting, combined/mutual gravitational lensing (dual photon rings)
 - [ ] Accretion disk flare / instability event (timed brightness burst)
 
 ## 2. Milky Way scene
