@@ -79,10 +79,14 @@ body {
 }
 
 /* title */
+/* fixed width, not min-width: #nav's clearance is derived from this panel's
+   right edge, and with min-width the h1 pushed it 82px wider than the number
+   suggested — so the nav overlapped anyway. The longest h1 is "PSR J0952−0607"
+   at ~272px, so 344 has room to spare. */
 #title {
   top: 22px;
   left: 24px;
-  min-width: 290px
+  width: 344px
 }
 
 #title h1 {
@@ -342,13 +346,25 @@ button.on {
   display: contents
 }
 
-/* scene nav */
+/* scene nav.
+   Bounded by left/right rather than centred with translateX. Centring let the
+   row grow symmetrically out of the viewport's middle until it slid under
+   #title on one side and #tel on the other — which is exactly what happened at
+   six tabs, where the row wants ~830px and the gap between those two panels is
+   ~824px at 1440. Pinning both edges to just clear them means the row can never
+   reach either panel however many tabs get added; it centres in whatever space
+   is left and wraps to a second line before it would overflow.
+   Offsets track #title (24 left + 344 wide) and #tel (24 right + 262 wide),
+   plus ~12px of breathing room. Both of those panels have a fixed width so
+   these stay valid; if you change either width, change these to match. */
 #nav {
   position: absolute;
-  left: 50%;
   top: 20px;
-  transform: translateX(-50%);
+  left: 380px;
+  right: 298px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   pointer-events: auto;
   z-index: 6
@@ -359,12 +375,14 @@ button.on {
 }
 
 .navb {
-  flex: 0 0 auto;
-  min-width: 132px;
+  /* shrink allowed, and no min-width: label length decides button width, so one
+     more tab costs only its own label rather than another flat 132px */
+  flex: 0 1 auto;
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: .22em;
-  padding: 9px 16px;
+  padding: 9px 13px;
+  white-space: nowrap;
   color: rgba(79, 240, 255, .62);
   background: linear-gradient(160deg, rgba(6, 20, 30, .62), rgba(2, 8, 14, .38));
   border: 1px solid rgba(79, 240, 255, .20);
@@ -719,14 +737,13 @@ body.touring #tourcap {
   text-align: center
 }
 
-/* ---------------- tablet ---------------- */
-@media(max-width:1024px) {
-  #meters {
-    display: none
-  }
-
+/* Six full labels need ~762px, and the band between #title and #tel is only
+   that wide at ~1440 and up. Below that, take back the space two ways at once —
+   short labels instead of full ones, and the narrower side panels that used to
+   start at 1024 — because either alone still left the nav wrapping to two rows
+   somewhere in the 1024-1300 range. */
+@media(max-width:1300px) {
   #title {
-    min-width: 0;
     width: 252px
   }
 
@@ -743,16 +760,42 @@ body.touring #tourcap {
     width: 242px
   }
 
+  /* clearances follow the panels above: 24 + 252 and 24 + 238, plus breathing room */
+  #nav {
+    left: 288px;
+    right: 274px
+  }
+
+  .navb {
+    padding: 9px 10px
+  }
+
+  .navb .full {
+    display: none
+  }
+
+  .navb .abbr {
+    display: inline
+  }
+}
+
+/* ---------------- tablet ---------------- */
+@media(max-width:1024px) {
+  #meters {
+    display: none
+  }
+
   #bodies {
     top: 126px;
     width: 182px
   }
 
+  /* 6px sides, not 9: at exactly 1024 the row needed ~470px against the 462
+     available and tipped onto a second line */
   .navb {
-    min-width: 110px;
     font-size: 8.5px;
     letter-spacing: .18em;
-    padding: 8px 11px
+    padding: 8px 6px
   }
 
   #ret {
@@ -791,9 +834,12 @@ body.touring #tourcap {
     transform: none
   }
 
+  /* 3x2 rather than one row: at six tabs a single row gives each ~55px on a
+     phone, which truncates even the short labels. Derived from the tab count —
+     if a seventh scene lands, this wants to become repeat(4, 1fr). */
   #nav {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 4px
   }
 
