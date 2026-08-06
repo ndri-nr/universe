@@ -566,6 +566,26 @@ float iSphere(vec3 ro, vec3 rd, vec3 ce, float ra){
   if(h < 0.0) return -1.0;
   return -b - sqrt(h);
 }
+/* ray/ellipsoid intersection: rescale space by 1/radii so the ellipsoid
+   becomes a unit sphere, solve there, scale the root back. Used for
+   Ceres/Vesta below — a perfect sphere reads as "mini smooth planet", not
+   an asteroid; real Vesta especially is visibly lumpy (a huge impact basin
+   flattens one pole). No raymarch needed, still a closed-form quadratic. */
+float iEllipsoid(vec3 ro, vec3 rd, vec3 ce, vec3 radii){
+  vec3 oc = (ro - ce) / radii;
+  vec3 rdn = rd / radii;
+  float a = dot(rdn, rdn);
+  float b = dot(oc, rdn);
+  float c = dot(oc, oc) - 1.0;
+  float h = b*b - a*c;
+  if(h < 0.0) return -1.0;
+  return (-b - sqrt(h)) / a;
+}
+/* surface normal of that same ellipsoid at point p — gradient of
+   ((p-ce)/radii)^2 = 1, i.e. (p-ce)/radii^2 */
+vec3 ellipsoidNormal(vec3 p, vec3 ce, vec3 radii){
+  return normalize((p - ce) / (radii*radii));
+}
 
 /* per-planet surface albedo, sampled in a slowly spinning body frame.
    emissive is light the surface itself puts out — city lights on Earth's
@@ -724,6 +744,23 @@ vec3 plutoCharonSurface(vec3 n, int id){
                         : vec3(0.58,0.56,0.58);  // Charon: neutral grey
   return mix(base*0.75, base*1.15, c);
 }
+/* rough, cratered, and — for Vesta — visibly lopsided: a perfect sphere with
+   a smooth gradient reads as a mini planet, not an asteroid. Rendered on the
+   ellipsoid shape from iEllipsoid()/ellipsoidNormal() above. */
+vec3 asteroidSurface(vec3 n, int id){
+  float rough = fbm(n*14.0 + float(id)*9.0);
+  vec3  base  = mix(vec3(0.42,0.39,0.35), vec3(0.62,0.58,0.52), rough);
+  float craters = pow(max(fbm(n*22.0 + 3.0) - 0.58, 0.0) * 2.4, 3.0);
+  base *= 1.0 - craters*0.55;
+  if(id == 24){
+    /* Vesta: Rheasilvia, an impact basin large enough to dominate one whole
+       hemisphere in reality — not a subtle crater */
+    vec3  d = n - vec3(0.0,-1.0,0.0);
+    float basin = exp(-dot(d,d) * 2.2);
+    base = mix(base, base*0.55, basin);
+  }
+  return base;
+}
 
 /* ---- Pluto/Charon: a true binary, not a planet-with-a-moon ----
    Charon is unusually large relative to Pluto (about half its diameter), so
@@ -774,6 +811,34 @@ vec3 charonPos(vec3 bary){
    dedicated neighbour-clearance sweep needed here. */
 const float COMET_AU=8.0, COMET_ECC=0.92, COMET_INC=0.35, COMET_NODE=0.5, COMET_PH0=0.0;
 const float COMET_RAD = 0.045;
+
+/* generic tilted-ellipse position, same math as planetPos()/plutoBary() but
+   parametrised so a new small body doesn't need its own copy-pasted
+   function — used by Ceres/Vesta below. */
+vec3 smallBodyPos(float au, float ecc, float inc, float node, float ph0){
+  float orbRb = 4.6 * pow(au, 0.48);
+  float m  = uTime * pow(au, -1.5) * ORB_RATE * uOrbit;
+  float nu = ph0 + m;
+  float R  = orbRb * (1.0 - ecc*ecc) / (1.0 + ecc*cos(m));
+  float cn = cos(node), sn = sin(node);
+  float ci = cos(inc),  si = sin(inc);
+  vec3  u  = vec3(cn, 0.0, sn);
+  vec3  w  = vec3(-sn*ci, si, cn*ci);
+  return R * (cos(nu)*u + sin(nu)*w);
+}
+
+/* ---- notable asteroids: Ceres and Vesta, the belt's two biggest, rendered
+   as distinct clickable bodies rather than lost in the generic speckle
+   field. Both sit well inside the belt's already-established safe zone
+   (6.4-8.6), so no separate neighbour-clearance sweep is needed — same
+   reasoning as the comet. */
+const float CERES_AU=2.77, CERES_ECC=0.076, CERES_INC=0.185, CERES_NODE=1.40, CERES_PH0=1.1;
+const float VESTA_AU=2.36, VESTA_ECC=0.089, VESTA_INC=0.124, VESTA_NODE=2.62, VESTA_PH0=4.0;
+/* ellipsoid, not sphere — Ceres is close to round but not quite (a mild
+   flattening), Vesta is genuinely lumpy: Rheasilvia, the impact basin at its
+   south pole, flattens and widens that whole hemisphere in reality. */
+const vec3  CERES_RAD = vec3(0.055, 0.050, 0.057);
+const vec3  VESTA_RAD = vec3(0.044, 0.036, 0.041);
 
 vec3 cometPos(){
   float orbRc = 4.6 * pow(COMET_AU, 0.48);
@@ -850,6 +915,12 @@ void main(){
   vec3  cometP = cometPos();
   float tComet = iSphere(ro, rd, cometP, COMET_RAD);
   if(tComet  > 0.0 && tComet  < tB){ tB = tComet;  id = 22; ce = cometP;  ra = COMET_RAD; }
+  vec3  ceresP = smallBodyPos(CERES_AU, CERES_ECC, CERES_INC, CERES_NODE, CERES_PH0);
+  vec3  vestaP = smallBodyPos(VESTA_AU, VESTA_ECC, VESTA_INC, VESTA_NODE, VESTA_PH0);
+  float tCeres = iEllipsoid(ro, rd, ceresP, CERES_RAD);
+  float tVesta = iEllipsoid(ro, rd, vestaP, VESTA_RAD);
+  if(tCeres  > 0.0 && tCeres  < tB){ tB = tCeres;  id = 23; ce = ceresP;  ra = CERES_RAD.x; }
+  if(tVesta  > 0.0 && tVesta  < tB){ tB = tVesta;  id = 24; ce = vestaP;  ra = VESTA_RAD.x; }
 
   vec3 col;
   if(id == 8){
@@ -861,13 +932,17 @@ void main(){
     col = mix(vec3(1.30,0.60,0.16), vec3(1.48,1.12,0.62), gran) * (0.42 + 0.72*limb) * uSunL;
   } else if(id >= 0){
     vec3 p = ro + rd*tB;
-    vec3 n = normalize(p - ce);
+    vec3 n = (id == 23) ? ellipsoidNormal(p, ce, CERES_RAD)
+           : (id == 24) ? ellipsoidNormal(p, ce, VESTA_RAD)
+           : normalize(p - ce);
     vec3 L = normalize(uSunPos - p);              // light from the displaced Sun
     float dif = max(dot(n, L), 0.0);
     float att = 1.0 / (1.0 + 0.011*length(p - uSunPos));   // gentler than inverse-square
     vec3 emissive = vec3(0.0);
     vec3 base = (id < 9) ? surface(id, n, emissive) : (id <= 19) ? moonSurface(n, id)
-              : (id <= 21) ? plutoCharonSurface(n, id) : vec3(0.42,0.44,0.48);  // 22: comet nucleus, dirty ice
+              : (id <= 21) ? plutoCharonSurface(n, id)
+              : (id == 22) ? vec3(0.42,0.44,0.48)                              // comet nucleus, dirty ice
+              : asteroidSurface(n, id);                                         // 23/24: Ceres/Vesta
     /* fine mottling: invisible at system scale, gives the surface texture once
        you zoom in on a single body. Only costs anything on pixels that hit. */
     base *= 0.88 + 0.26*fbm(n*26.0) + 0.10*vnoise(n*70.0);

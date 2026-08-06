@@ -3,7 +3,7 @@
    render.js — render.js already needs updateHud, so importing render state
    back here would make the two modules circular for no real benefit. */
 import { S, SCENES } from './state.js';
-import { bodyRad, sunPos, FACTS, SUN_FACT, ORB_RATE, SUN_R } from './ephemeris.js';
+import { bodyRad, sunPos, FACTS, SUN_FACT, CERES_FACT, VESTA_FACT, ORB_RATE, SUN_R } from './ephemeris.js';
 
 const $ = id => document.getElementById(id);
 
@@ -70,7 +70,10 @@ function hudSolar(t, r){
        ['ORBIT SCALE',   'a^0.48'],
        ['SUN OFF-CENTRE', (Math.hypot(...sunPos(t))/SUN_R).toFixed(2) + ' R☉']]
     : (function(){
-        const F = (S.focus === 8) ? SUN_FACT : FACTS[S.focus];
+        const F = (S.focus === 8) ? SUN_FACT
+                : (S.focus === 23) ? CERES_FACT
+                : (S.focus === 24) ? VESTA_FACT
+                : FACTS[S.focus];
         return [['DIAMETER',      F.d],
                 ['MASS',          F.m],
                 ['SURFACE GRAV',  F.g],

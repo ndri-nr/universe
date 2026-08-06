@@ -1,202 +1,261 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>SINGULARITY OBSERVATORY</title>
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>SINGULARITY OBSERVATORY</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
+
 <body>
 
-<canvas id="gl"></canvas>
+  <canvas id="gl"></canvas>
 
-<div id="hud">
-  <div id="grid"></div>
-  <div id="vig"></div>
-  <div id="scan"></div>
-  <div class="corner c1"></div><div class="corner c2"></div>
-  <div class="corner c3"></div><div class="corner c4"></div>
+  <div id="hud">
+    <div id="grid"></div>
+    <div id="vig"></div>
+    <div id="scan"></div>
+    <div class="corner c1"></div>
+    <div class="corner c2"></div>
+    <div class="corner c3"></div>
+    <div class="corner c4"></div>
 
-  <div id="ret">
-    <svg viewBox="0 0 230 230">
-      <circle cx="115" cy="115" r="52" fill="none" stroke="rgba(79,240,255,.30)" stroke-width="1" stroke-dasharray="3 7"/>
-      <g class="spin">
-        <circle cx="115" cy="115" r="74" fill="none" stroke="rgba(79,240,255,.22)" stroke-width="1" stroke-dasharray="34 12 6 12"/>
-        <path d="M115 33 l7 11 h-14z" fill="rgba(79,240,255,.6)"/>
-      </g>
-      <g class="spin rev">
-        <circle cx="115" cy="115" r="96" fill="none" stroke="rgba(255,180,87,.18)" stroke-width="1" stroke-dasharray="2 10"/>
-      </g>
-      <g stroke="rgba(79,240,255,.5)" stroke-width="1">
-        <path d="M115 6 v16 M115 224 v-16 M6 115 h16 M224 115 h-16"/>
-      </g>
-      <text x="115" y="118" text-anchor="middle" font-family="ui-monospace,monospace" font-size="7"
-            fill="rgba(79,240,255,.55)" letter-spacing="2">EVENT HORIZON</text>
-    </svg>
-  </div>
+    <div id="ret">
+      <svg viewBox="0 0 230 230">
+        <circle cx="115" cy="115" r="52" fill="none" stroke="rgba(79,240,255,.30)" stroke-width="1"
+          stroke-dasharray="3 7" />
+        <g class="spin">
+          <circle cx="115" cy="115" r="74" fill="none" stroke="rgba(79,240,255,.22)" stroke-width="1"
+            stroke-dasharray="34 12 6 12" />
+          <path d="M115 33 l7 11 h-14z" fill="rgba(79,240,255,.6)" />
+        </g>
+        <g class="spin rev">
+          <circle cx="115" cy="115" r="96" fill="none" stroke="rgba(255,180,87,.18)" stroke-width="1"
+            stroke-dasharray="2 10" />
+        </g>
+        <g stroke="rgba(79,240,255,.5)" stroke-width="1">
+          <path d="M115 6 v16 M115 224 v-16 M6 115 h16 M224 115 h-16" />
+        </g>
+        <text x="115" y="118" text-anchor="middle" font-family="ui-monospace,monospace" font-size="7"
+          fill="rgba(79,240,255,.55)" letter-spacing="2">EVENT HORIZON</text>
+      </svg>
+    </div>
 
-  <!-- On mobile this becomes a flex column so the panels stack in flow. Absolute
+    <!-- On mobile this becomes a flex column so the panels stack in flow. Absolute
        `top` values per scene are what let the body-chip row overlap the title. -->
-  <div id="topstack">
-  <div id="nav">
-    <button class="navb on" data-go="bh"><span class="full">◈ SGR A*</span><span class="abbr">◈ SGR A*</span></button>
-    <button class="navb" data-go="mw"><span class="full">◈ MILKY WAY</span><span class="abbr">◈ GALAXY</span></button>
-    <button class="navb" data-go="ss"><span class="full">◈ SOLAR SYSTEM</span><span class="abbr">◈ PLANETS</span></button>
-  </div>
+    <div id="topstack">
+      <div id="nav">
+        <button class="navb on" data-go="bh"><span class="full">◈ SGR A*</span><span class="abbr">◈ SGR
+            A*</span></button>
+        <button class="navb" data-go="mw"><span class="full">◈ MILKY WAY</span><span class="abbr">◈
+            GALAXY</span></button>
+        <button class="navb" data-go="ss"><span class="full">◈ SOLAR SYSTEM</span><span class="abbr">◈
+            PLANETS</span></button>
+      </div>
 
-  <div id="bodies" class="panel" data-sc="ss">
-    <div class="lbl" style="margin-bottom:7px">body select</div>
-    <button class="bb on" data-b="-1">◇ FULL SYSTEM</button>
-    <button class="bb" data-b="8">☉ SUN</button>
-    <button class="bb" data-b="0">① MERCURY</button>
-    <button class="bb" data-b="1">② VENUS</button>
-    <button class="bb" data-b="2">③ EARTH</button>
-    <button class="bb" data-b="3">④ MARS</button>
-    <button class="bb" data-b="4">⑤ JUPITER</button>
-    <button class="bb" data-b="5">⑥ SATURN</button>
-    <button class="bb" data-b="6">⑦ URANUS</button>
-    <button class="bb" data-b="7">⑧ NEPTUNE</button>
-    <div class="lbl" style="margin-top:8px;opacity:.6">or click a body</div>
-    <div style="display:flex;gap:4px;margin-top:6px">
-      <button class="bb" id="bb-prev" style="flex:1;text-align:center">◀ PREV</button>
-      <button class="bb" id="bb-next" style="flex:1;text-align:center">NEXT ▶</button>
+      <div id="bodies" class="panel" data-sc="ss">
+        <div class="lbl" style="margin-bottom:7px">body select</div>
+        <button class="bb on" data-b="-1">◇ FULL SYSTEM</button>
+        <button class="bb" data-b="8">☉ SUN</button>
+        <button class="bb" data-b="0">① MERCURY</button>
+        <button class="bb" data-b="1">② VENUS</button>
+        <button class="bb" data-b="2">③ EARTH</button>
+        <button class="bb" data-b="3">④ MARS</button>
+        <button class="bb" data-b="23">◈ CERES (ASTEROID)</button>
+        <button class="bb" data-b="24">◈ VESTA (ASTEROID)</button>
+        <button class="bb" data-b="4">⑤ JUPITER</button>
+        <button class="bb" data-b="5">⑥ SATURN</button>
+        <button class="bb" data-b="6">⑦ URANUS</button>
+        <button class="bb" data-b="7">⑧ NEPTUNE</button>
+        <div class="lbl" style="margin-top:8px;opacity:.6">or click a body</div>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button class="bb" id="bb-prev" style="flex:1;text-align:center">◀ PREV</button>
+          <button class="bb" id="bb-next" style="flex:1;text-align:center">NEXT ▶</button>
+        </div>
+      </div>
+
+      <div id="title" class="panel">
+        <div class="lbl" id="ti-lbl">deep field observatory // node-07</div>
+        <h1 id="ti-h1">SGR A*</h1>
+        <div class="sub" id="ti-sub">SCHWARZSCHILD CLASS &middot; M = 4.297e6 M<sub>&#9737;</sub></div>
+        <div class="bar"><i></i></div>
+      </div>
+
+      <div id="tel" class="panel">
+        <div class="hd">
+          <button class="fold" id="t-tog" title="collapse telemetry" aria-label="collapse telemetry">
+            <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true">
+              <path d="M2.4 4 L5 6.6 L7.6 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="lbl">telemetry stream</div>
+        </div>
+        <div class="rows">
+          <div class="row"><span id="t-rl">OBS RADIUS</span><b id="t-r">0</b></div>
+          <div class="row" data-sc="bh"><span>REDSHIFT z</span><b id="t-z">0</b></div>
+          <div class="row" data-sc="bh"><span>TIME DILATION</span><b id="t-d">0</b></div>
+          <div class="row" data-sc="bh"><span>DISK T_max</span><b id="t-t">0</b></div>
+          <div class="row" data-sc="bh"><span>JET LORENTZ &Gamma;</span><b id="t-g">0</b></div>
+          <div class="row" data-sc="bh"><span>APPARENT &beta;_app</span><b id="t-b">0</b></div>
+          <div class="row" data-sc="bh"><span>BEAMED LOBE</span><b id="t-j">0</b></div>
+          <div class="row" data-sc="bh"><span>COMPANION</span><b id="t-cm">NONE</b></div>
+          <div class="row" data-sc="bh"><span>FLARE STATE</span><b id="t-fl">QUIESCENT</b></div>
+          <div class="row" data-sc="mw"><span>SPIRAL ARMS</span><b id="g-a">0</b></div>
+          <div class="row" data-sc="mw"><span>PITCH ANGLE</span><b id="g-p">0</b></div>
+          <div class="row" data-sc="mw"><span>PATTERN &Omega;_p</span><b id="g-o">0</b></div>
+          <div class="row" data-sc="mw"><span>DUST OPACITY</span><b id="g-d">0</b></div>
+          <div class="row" data-sc="mw"><span>SOLAR ORBIT</span><b id="g-s">0</b></div>
+          <div class="row" data-sc="ss"><span id="p-l1">-</span><b id="p-v1">0</b></div>
+          <div class="row" data-sc="ss"><span id="p-l2">-</span><b id="p-v2">0</b></div>
+          <div class="row" data-sc="ss"><span id="p-l3">-</span><b id="p-v3">0</b></div>
+          <div class="row" data-sc="ss"><span id="p-l4">-</span><b id="p-v4">0</b></div>
+          <div class="row" data-sc="ss"><span id="p-l5">-</span><b id="p-v5">0</b></div>
+          <div class="row" data-sc="ss"><span id="p-l6">-</span><b id="p-v6">0</b></div>
+          <div class="row"><span id="t-sl">PHOTON STEPS</span><b id="t-s">0</b></div>
+          <div class="row"><span>RENDER</span><b id="t-p">0</b></div>
+          <div class="row"><span>FRAME RATE</span><b id="t-f">0</b></div>
+          <div class="row"><span>LINK</span><b id="t-l" class="warn">STABLE</b></div>
+        </div>
+      </div>
+    </div><!-- /topstack -->
+
+    <div id="meters" class="panel">
+      <div class="lbl">field integrity</div>
+      <div class="meter">
+        <div class="t"><span id="m1l">GRAVITATIONAL FLUX</span><em id="m1v">0%</em></div>
+        <div class="track"><i id="m1" style="width:0"></i></div>
+      </div>
+      <div class="meter">
+        <div class="t"><span id="m2l">ACCRETION LUMINOSITY</span><em id="m2v">0%</em></div>
+        <div class="track am"><i id="m2" style="width:0"></i></div>
+      </div>
+      <div class="meter">
+        <div class="t"><span id="m3l">DOPPLER BEAMING</span><em id="m3v">0%</em></div>
+        <div class="track mg"><i id="m3" style="width:0"></i></div>
+      </div>
+      <div class="meter">
+        <div class="t"><span id="m4l">JET COLLIMATION</span><em id="m4v">0%</em></div>
+        <div class="track mg"><i id="m4" style="width:0"></i></div>
+      </div>
+      <div class="meter">
+        <div class="t"><span id="m5l">HAWKING NOISE FLOOR</span><em id="m5v">0%</em></div>
+        <div class="track"><i id="m5" style="width:0"></i></div>
+      </div>
+    </div>
+
+    <div id="ctrl" class="panel">
+      <div class="hd">
+        <button class="fold" id="c-tog" title="collapse controls" aria-label="collapse controls">
+          <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true">
+            <path d="M2.4 4 L5 6.6 L7.6 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+        <div class="lbl">control array</div>
+        <em>[H] HIDE HUD</em>
+      </div>
+      <div class="ctl" data-sc="bh"><label>DISK LUMINOSITY <var id="v-disk">1.00</var></label>
+        <input id="s-disk" type="range" min="0" max="3" step="0.01" value="1.15">
+      </div>
+      <div class="ctl" data-sc="bh"><label>LENSING STRENGTH <var id="v-lens">1.00</var></label>
+        <input id="s-lens" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="bh"><label>ORBITAL VELOCITY <var id="v-spin">1.00</var></label>
+        <input id="s-spin" type="range" min="0" max="3" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="bh"><label>RELATIVISTIC JET <var id="v-jet">1.00</var></label>
+        <input id="s-jet" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="bh"><label>DOPPLER BEAMING <var id="v-dopp">1.00</var></label>
+        <input id="s-dopp" type="range" min="0" max="2" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="bh"><label>COMPANION MASS <var id="v-comp">0.00</var></label>
+        <input id="s-comp" type="range" min="0" max="0.8" step="0.01" value="0">
+      </div>
+      <div class="ctl" data-sc="bh"><label>COMPANION SEPARATION <var id="v-sep">8.00</var></label>
+        <input id="s-sep" type="range" min="3" max="20" step="0.1" value="8">
+      </div>
+      <div class="ctl" data-sc="bh"><label>FLARE ACTIVITY <var id="v-flare">1.00</var></label>
+        <input id="s-flare" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+
+      <div class="ctl" data-sc="mw"><label>ARM DEFINITION <var id="v-arm">1.00</var></label>
+        <input id="s-arm" type="range" min="0" max="2" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="mw"><label>DUST OPACITY <var id="v-dust">1.00</var></label>
+        <input id="s-dust" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="mw"><label>CORE LUMINOSITY <var id="v-core">1.00</var></label>
+        <input id="s-core" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="mw"><label>HII REGIONS <var id="v-hii">1.00</var></label>
+        <input id="s-hii" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="mw"><label>PATTERN ROTATION <var id="v-rot">1.00</var></label>
+        <input id="s-rot" type="range" min="0" max="3" step="0.01" value="1">
+      </div>
+
+      <div class="ctl" data-sc="ss"><label>ORBITAL SPEED <var id="v-orbit">1.00</var></label>
+        <input id="s-orbit" type="range" min="0" max="4" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="ss"><label>SOLAR LUMINOSITY <var id="v-sunl">1.00</var></label>
+        <input id="s-sunl" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="ss"><label>ORBIT PATHS <var id="v-path">1.00</var></label>
+        <input id="s-path" type="range" min="0" max="3" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="ss"><label>SURFACE DETAIL <var id="v-detail">1.00</var></label>
+        <input id="s-detail" type="range" min="0" max="2" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="ss"><label>ASTEROID BELT <var id="v-belt">1.00</var></label>
+        <input id="s-belt" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl" data-sc="ss"><label>SUN BARYCENTRE WOBBLE <var id="v-bary">0.00</var></label>
+        <input id="s-bary" type="range" min="0" max="3" step="0.01" value="0">
+      </div>
+      <div class="ctl" data-sc="mw"><label>SOLAR ORBIT MARKER <var id="v-smark">1.00</var></label>
+        <input id="s-smark" type="range" min="0" max="2.5" step="0.01" value="1">
+      </div>
+
+      <div class="ctl"><label>BLOOM / GLOW <var id="v-bloom">1.00</var></label>
+        <input id="s-bloom" type="range" min="0" max="2.5" step="0.01" value="1.05">
+      </div>
+      <div class="ctl"><label>STARFIELD <var id="v-star">1.00</var></label>
+        <input id="s-star" type="range" min="0" max="2" step="0.01" value="1">
+      </div>
+      <div class="btns">
+        <button id="b-auto" class="on">AUTO-ORBIT</button>
+        <button id="b-q">QUALITY: HIGH</button>
+        <button id="b-hud">HUD</button>
+        <button id="b-reset">RESET</button>
+      </div>
+    </div>
+
+    <div id="hint">DRAG&nbsp;=&nbsp;ORBIT &nbsp;&middot;&nbsp; SCROLL&nbsp;=&nbsp;APPROACH &nbsp;&middot;&nbsp;
+      TAB&nbsp;/&nbsp;1&nbsp;2&nbsp;=&nbsp;SCENE &nbsp;&middot;&nbsp; &larr;&nbsp;&rarr;&nbsp;=&nbsp;BODY
+      &nbsp;&middot;&nbsp; H&nbsp;=&nbsp;HUD &nbsp;&middot;&nbsp; R&nbsp;=&nbsp;RESET</div>
+    <div id="tick">
+      <div>◆ GRAVITATIONAL WAVE DETECTOR ONLINE ◆ EVENT HORIZON RADIUS 1.27e10 M ◆ ACCRETION RATE 1.4e-8 M⊙/YR ◆ PHOTON
+        SPHERE LOCKED AT 1.5 R_S ◆ ISCO STABLE ◆ RELATIVISTIC JET: ACTIVE &middot; Γ=2.72 &middot; β=0.93c ◆ SYNCHROTRON
+        LOBES BEAMED ALONG SPIN AXIS ◆ TIDAL SHEAR WITHIN TOLERANCE ◆ SPACETIME CURVATURE MAPPED VIA NULL GEODESIC
+        INTEGRATION ◆ WARNING: DO NOT CROSS R &lt; 3 R_S ◆</div>
     </div>
   </div>
 
-  <div id="title" class="panel">
-    <div class="lbl" id="ti-lbl">deep field observatory // node-07</div>
-    <h1 id="ti-h1">SGR A*</h1>
-    <div class="sub" id="ti-sub">SCHWARZSCHILD CLASS &middot; M = 4.297e6 M<sub>&#9737;</sub></div>
-    <div class="bar"><i></i></div>
+  <div id="boot">
+    <h2>SINGULARITY OBSERVATORY</h2>
+    <div class="log" id="bootlog"></div>
+    <div class="pb"><i id="bootbar"></i></div>
   </div>
 
-  <div id="tel" class="panel">
-    <div class="hd">
-      <button class="fold" id="t-tog" title="collapse telemetry" aria-label="collapse telemetry">
-        <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2.4 4 L5 6.6 L7.6 4"
-          fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div class="lbl">telemetry stream</div>
-    </div>
-    <div class="rows">
-    <div class="row"><span id="t-rl">OBS RADIUS</span><b id="t-r">0</b></div>
-    <div class="row" data-sc="bh"><span>REDSHIFT z</span><b id="t-z">0</b></div>
-    <div class="row" data-sc="bh"><span>TIME DILATION</span><b id="t-d">0</b></div>
-    <div class="row" data-sc="bh"><span>DISK T_max</span><b id="t-t">0</b></div>
-    <div class="row" data-sc="bh"><span>JET LORENTZ &Gamma;</span><b id="t-g">0</b></div>
-    <div class="row" data-sc="bh"><span>APPARENT &beta;_app</span><b id="t-b">0</b></div>
-    <div class="row" data-sc="bh"><span>BEAMED LOBE</span><b id="t-j">0</b></div>
-    <div class="row" data-sc="bh"><span>COMPANION</span><b id="t-cm">NONE</b></div>
-    <div class="row" data-sc="bh"><span>FLARE STATE</span><b id="t-fl">QUIESCENT</b></div>
-    <div class="row" data-sc="mw"><span>SPIRAL ARMS</span><b id="g-a">0</b></div>
-    <div class="row" data-sc="mw"><span>PITCH ANGLE</span><b id="g-p">0</b></div>
-    <div class="row" data-sc="mw"><span>PATTERN &Omega;_p</span><b id="g-o">0</b></div>
-    <div class="row" data-sc="mw"><span>DUST OPACITY</span><b id="g-d">0</b></div>
-    <div class="row" data-sc="mw"><span>SOLAR ORBIT</span><b id="g-s">0</b></div>
-    <div class="row" data-sc="ss"><span id="p-l1">-</span><b id="p-v1">0</b></div>
-    <div class="row" data-sc="ss"><span id="p-l2">-</span><b id="p-v2">0</b></div>
-    <div class="row" data-sc="ss"><span id="p-l3">-</span><b id="p-v3">0</b></div>
-    <div class="row" data-sc="ss"><span id="p-l4">-</span><b id="p-v4">0</b></div>
-    <div class="row" data-sc="ss"><span id="p-l5">-</span><b id="p-v5">0</b></div>
-    <div class="row" data-sc="ss"><span id="p-l6">-</span><b id="p-v6">0</b></div>
-    <div class="row"><span id="t-sl">PHOTON STEPS</span><b id="t-s">0</b></div>
-    <div class="row"><span>RENDER</span><b id="t-p">0</b></div>
-    <div class="row"><span>FRAME RATE</span><b id="t-f">0</b></div>
-    <div class="row"><span>LINK</span><b id="t-l" class="warn">STABLE</b></div>
-    </div>
-  </div>
-  </div><!-- /topstack -->
-
-  <div id="meters" class="panel">
-    <div class="lbl">field integrity</div>
-    <div class="meter"><div class="t"><span id="m1l">GRAVITATIONAL FLUX</span><em id="m1v">0%</em></div>
-      <div class="track"><i id="m1" style="width:0"></i></div></div>
-    <div class="meter"><div class="t"><span id="m2l">ACCRETION LUMINOSITY</span><em id="m2v">0%</em></div>
-      <div class="track am"><i id="m2" style="width:0"></i></div></div>
-    <div class="meter"><div class="t"><span id="m3l">DOPPLER BEAMING</span><em id="m3v">0%</em></div>
-      <div class="track mg"><i id="m3" style="width:0"></i></div></div>
-    <div class="meter"><div class="t"><span id="m4l">JET COLLIMATION</span><em id="m4v">0%</em></div>
-      <div class="track mg"><i id="m4" style="width:0"></i></div></div>
-    <div class="meter"><div class="t"><span id="m5l">HAWKING NOISE FLOOR</span><em id="m5v">0%</em></div>
-      <div class="track"><i id="m5" style="width:0"></i></div></div>
+  <div id="err">
+    <div><b>WEBGL2 TIDAK TERSEDIA</b><br><br>Browser/GPU ini tidak mendukung WebGL2.<br>Coba Chrome / Edge / Firefox
+      terbaru, atau aktifkan akselerasi hardware.</div>
   </div>
 
-  <div id="ctrl" class="panel">
-    <div class="hd">
-      <button class="fold" id="c-tog" title="collapse controls" aria-label="collapse controls">
-        <svg viewBox="0 0 10 10" width="9" height="9" aria-hidden="true"><path d="M2.4 4 L5 6.6 L7.6 4"
-          fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div class="lbl">control array</div>
-      <em>[H] HIDE HUD</em>
-    </div>
-    <div class="ctl" data-sc="bh"><label>DISK LUMINOSITY <var id="v-disk">1.00</var></label>
-      <input id="s-disk" type="range" min="0" max="3" step="0.01" value="1.15"></div>
-    <div class="ctl" data-sc="bh"><label>LENSING STRENGTH <var id="v-lens">1.00</var></label>
-      <input id="s-lens" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="bh"><label>ORBITAL VELOCITY <var id="v-spin">1.00</var></label>
-      <input id="s-spin" type="range" min="0" max="3" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="bh"><label>RELATIVISTIC JET <var id="v-jet">1.00</var></label>
-      <input id="s-jet" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="bh"><label>DOPPLER BEAMING <var id="v-dopp">1.00</var></label>
-      <input id="s-dopp" type="range" min="0" max="2" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="bh"><label>COMPANION MASS <var id="v-comp">0.00</var></label>
-      <input id="s-comp" type="range" min="0" max="0.8" step="0.01" value="0"></div>
-    <div class="ctl" data-sc="bh"><label>COMPANION SEPARATION <var id="v-sep">8.00</var></label>
-      <input id="s-sep" type="range" min="3" max="20" step="0.1" value="8"></div>
-    <div class="ctl" data-sc="bh"><label>FLARE ACTIVITY <var id="v-flare">1.00</var></label>
-      <input id="s-flare" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-
-    <div class="ctl" data-sc="mw"><label>ARM DEFINITION <var id="v-arm">1.00</var></label>
-      <input id="s-arm" type="range" min="0" max="2" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="mw"><label>DUST OPACITY <var id="v-dust">1.00</var></label>
-      <input id="s-dust" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="mw"><label>CORE LUMINOSITY <var id="v-core">1.00</var></label>
-      <input id="s-core" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="mw"><label>HII REGIONS <var id="v-hii">1.00</var></label>
-      <input id="s-hii" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="mw"><label>PATTERN ROTATION <var id="v-rot">1.00</var></label>
-      <input id="s-rot" type="range" min="0" max="3" step="0.01" value="1"></div>
-
-    <div class="ctl" data-sc="ss"><label>ORBITAL SPEED <var id="v-orbit">1.00</var></label>
-      <input id="s-orbit" type="range" min="0" max="4" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="ss"><label>SOLAR LUMINOSITY <var id="v-sunl">1.00</var></label>
-      <input id="s-sunl" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="ss"><label>ORBIT PATHS <var id="v-path">1.00</var></label>
-      <input id="s-path" type="range" min="0" max="3" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="ss"><label>SURFACE DETAIL <var id="v-detail">1.00</var></label>
-      <input id="s-detail" type="range" min="0" max="2" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="ss"><label>ASTEROID BELT <var id="v-belt">1.00</var></label>
-      <input id="s-belt" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-    <div class="ctl" data-sc="ss"><label>SUN BARYCENTRE WOBBLE <var id="v-bary">0.00</var></label>
-      <input id="s-bary" type="range" min="0" max="3" step="0.01" value="0"></div>
-    <div class="ctl" data-sc="mw"><label>SOLAR ORBIT MARKER <var id="v-smark">1.00</var></label>
-      <input id="s-smark" type="range" min="0" max="2.5" step="0.01" value="1"></div>
-
-    <div class="ctl"><label>BLOOM / GLOW <var id="v-bloom">1.00</var></label>
-      <input id="s-bloom" type="range" min="0" max="2.5" step="0.01" value="1.05"></div>
-    <div class="ctl"><label>STARFIELD <var id="v-star">1.00</var></label>
-      <input id="s-star" type="range" min="0" max="2" step="0.01" value="1"></div>
-    <div class="btns">
-      <button id="b-auto" class="on">AUTO-ORBIT</button>
-      <button id="b-q">QUALITY: HIGH</button>
-      <button id="b-hud">HUD</button>
-      <button id="b-reset">RESET</button>
-    </div>
-  </div>
-
-  <div id="hint">DRAG&nbsp;=&nbsp;ORBIT &nbsp;&middot;&nbsp; SCROLL&nbsp;=&nbsp;APPROACH &nbsp;&middot;&nbsp; TAB&nbsp;/&nbsp;1&nbsp;2&nbsp;=&nbsp;SCENE &nbsp;&middot;&nbsp; &larr;&nbsp;&rarr;&nbsp;=&nbsp;BODY &nbsp;&middot;&nbsp; H&nbsp;=&nbsp;HUD &nbsp;&middot;&nbsp; R&nbsp;=&nbsp;RESET</div>
-  <div id="tick"><div>◆ GRAVITATIONAL WAVE DETECTOR ONLINE ◆ EVENT HORIZON RADIUS 1.27e10 M ◆ ACCRETION RATE 1.4e-8 M⊙/YR ◆ PHOTON SPHERE LOCKED AT 1.5 R_S ◆ ISCO STABLE ◆ RELATIVISTIC JET: ACTIVE &middot; Γ=2.72 &middot; β=0.93c ◆ SYNCHROTRON LOBES BEAMED ALONG SPIN AXIS ◆ TIDAL SHEAR WITHIN TOLERANCE ◆ SPACETIME CURVATURE MAPPED VIA NULL GEODESIC INTEGRATION ◆ WARNING: DO NOT CROSS R &lt; 3 R_S ◆</div></div>
-</div>
-
-<div id="boot">
-  <h2>SINGULARITY OBSERVATORY</h2>
-  <div class="log" id="bootlog"></div>
-  <div class="pb"><i id="bootbar"></i></div>
-</div>
-
-<div id="err"><div><b>WEBGL2 TIDAK TERSEDIA</b><br><br>Browser/GPU ini tidak mendukung WebGL2.<br>Coba Chrome / Edge / Firefox terbaru, atau aktifkan akselerasi hardware.</div></div>
-
-<script type="module" src="js/main.js"></script>
+  <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

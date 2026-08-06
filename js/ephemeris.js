@@ -54,8 +54,35 @@ export function sunPos(t){
   const k = -BARY_EXAG * S.bary / M_SUN;
   return [x*k, y*k, z*k];
 }
-export function bodyPos(id, t){ return id === 8 ? sunPos(t) : planetPos(id, t); }
-export function bodyRad(id){ return id === 8 ? SUN_R : P_RAD[id]; }
+/* generic tilted-ellipse position — must match smallBodyPos() in FS_SS
+   exactly. Used for the notable asteroids (ids 23/24) below; extend here
+   rather than adding another bespoke function if more small bodies join. */
+export function smallBodyPos(au, ecc, inc, node, ph0, t){
+  const orbRb = 4.6 * Math.pow(au, 0.48);
+  const m  = t * Math.pow(au, -1.5) * ORB_RATE * S.orbit;
+  const nu = ph0 + m;
+  const R  = orbRb * (1 - ecc*ecc) / (1 + ecc*Math.cos(m));
+  const cn = Math.cos(node), sn = Math.sin(node);
+  const ci = Math.cos(inc),  si = Math.sin(inc);
+  const cu = Math.cos(nu), su = Math.sin(nu);
+  return [R*(cu*cn+su*(-sn*ci)), R*(su*si), R*(cu*sn+su*(cn*ci))];
+}
+/* Ceres/Vesta — must match the CERES_ and VESTA_ consts in FS_SS exactly */
+const CERES_AU=2.77, CERES_ECC=0.076, CERES_INC=0.185, CERES_NODE=1.40, CERES_PH0=1.1, CERES_RAD=0.055;
+const VESTA_AU=2.36, VESTA_ECC=0.089, VESTA_INC=0.124, VESTA_NODE=2.62, VESTA_PH0=4.0, VESTA_RAD=0.042;
+
+export function bodyPos(id, t){
+  if(id === 8)  return sunPos(t);
+  if(id === 23) return smallBodyPos(CERES_AU, CERES_ECC, CERES_INC, CERES_NODE, CERES_PH0, t);
+  if(id === 24) return smallBodyPos(VESTA_AU, VESTA_ECC, VESTA_INC, VESTA_NODE, VESTA_PH0, t);
+  return planetPos(id, t);
+}
+export function bodyRad(id){
+  if(id === 8)  return SUN_R;
+  if(id === 23) return CERES_RAD;
+  if(id === 24) return VESTA_RAD;
+  return P_RAD[id];
+}
 
 /* observed values; moon counts are the confirmed tallies and do drift upward */
 export const FACTS = [
@@ -70,14 +97,27 @@ export const FACTS = [
 ];
 export const SUN_FACT = {n:'SUN', d:'1,391,400 km', m:'333,000 M⊕', g:'274 m/s²',
                   day:'25.4 d equator', yr:'—', mo:'8 planets', T:'5,772 K', a:'0 AU'};
+/* the belt's two biggest — Ceres is large enough to be a dwarf planet in its
+   own right, Vesta the brightest asteroid as seen from Earth */
+export const CERES_FACT = {n:'CERES', d:'940 km', m:'0.00016 M⊕', g:'0.27 m/s²',
+                  day:'9.07 h', yr:'4.60 yr', mo:'0', T:'−105 °C', a:'2.77 AU'};
+export const VESTA_FACT = {n:'VESTA', d:'525 km', m:'0.00004 M⊕', g:'0.25 m/s²',
+                  day:'5.34 h', yr:'3.63 yr', mo:'0', T:'−96 °C',  a:'2.36 AU'};
 
 /* ---------------- deep links ----------------
    #bh, #mw, #ss, #ss/saturn — the body slug lives here since it's really part
    of the planet catalogue, not the routing logic itself (ui.js owns that). */
 export const BODY_SLUG = ['mercury','venus','earth','mars','jupiter','saturn','uranus','neptune'];
-export function slugFor(id){ return id === 8 ? 'sun' : (id >= 0 ? BODY_SLUG[id] : null); }
+export function slugFor(id){
+  if(id === 8)  return 'sun';
+  if(id === 23) return 'ceres';
+  if(id === 24) return 'vesta';
+  return id >= 0 ? BODY_SLUG[id] : null;
+}
 export function idForSlug(s){
-  if(s === 'sun') return 8;
+  if(s === 'sun')   return 8;
+  if(s === 'ceres') return 23;
+  if(s === 'vesta') return 24;
   const i = BODY_SLUG.indexOf(s);
   return i >= 0 ? i : -1;
 }
