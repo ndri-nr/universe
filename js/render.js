@@ -149,6 +149,7 @@ export function frame(now){
     gl.uniform1f(PS.u.uBeam, S.psBeam);
     gl.uniform1f(PS.u.uMag,  S.psMag);
     gl.uniform1f(PS.u.uTilt, S.psTilt);
+    gl.uniform1f(PS.u.uComp, S.psComp);
   } else if(S.scene === 'nb'){
     gl.uniform1f(PS.u.uDensity, S.nbDensity);
     gl.uniform1f(PS.u.uProto,   S.nbProto);

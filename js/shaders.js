@@ -1153,18 +1153,52 @@ void main(){
 }`;
 
 /* ============================ SCENE D: NEUTRON STAR / PULSAR ================
+   PSR J0952-0607, the fastest and heaviest known neutron star in the Galactic
+   disk: 707.31 Hz (P = 1.4138 ms), 2.35 M_sun, in a 6.419 h orbit with a
+   0.032 M_sun companion it is actively evaporating — a "black widow" system.
+
    A bounded volumetric march (same shape as the Milky Way scene's — no
    geodesic bending needed here, a neutron star's gravity is strong but its
    surface sits above the photon sphere, unlike a black hole). The whole
    point of a pulsar is the "oblique rotator" model: the beam runs along the
    MAGNETIC axis, which is tilted away from the spin axis, so as the star
    spins the beam sweeps a cone through space — that misalignment is why it
-   pulses at all rather than just glowing steadily. */
+   pulses at all rather than just glowing steadily.
+
+   Framing follows NASA/Goddard's black-widow concept art (the reference for
+   this scene — the only real image of J0952-0607 is a ~22nd-mag dot in a Keck
+   exposure, it is far too small to resolve): twin beams rendered in two bands,
+   green for radio and magenta for gamma-ray, and the companion showing a
+   brilliant irradiated day side against a nearly dark night side.
+
+   Two deliberate departures from true scale, both unavoidable and both the
+   same ones the concept art makes. Real separation is ~1.6e6 km = ~135,000
+   stellar radii, so at true scale the companion is off-frame; it is drawn at
+   9 radii instead. And the beam sweep is shown at roughly 1:2000 — a 1.41 ms
+   period is 707 rotations per displayed second, which is a strobe, not a
+   lighthouse. The HUD quotes the real numbers. */
 export const FS_PULSAR = GLSL_HEAD + `
-uniform float uSpin, uBeam, uMag, uTilt;
+uniform float uSpin, uBeam, uMag, uTilt, uComp;
 
 const float R_STAR = 1.0;
-const float R_HALO = 40.0;
+/* 16, not 40: nothing in this scene lives past the companion's orbit at 9 +
+   its 1.9 radius, and the beam falloff is exp(-r*0.55) — down to 3e-4 by r=15.
+   Shrinking the marched sphere both halves the samples and more than halves dt,
+   so the companion's surface shell actually resolves. */
+const float R_HALO = 16.0;
+const float A_ORB  = 9.0;    // compressed orbital separation (see header)
+/* companion radius. True ratio to the neutron star is ~5800:1 (70,000 km of
+   bloated, Roche-lobe-filling envelope against 12 km), so 2.8:1 still wildly
+   understates it — but it at least reads as "big star, tiny dense corpse"
+   rather than two objects of the same size. */
+const float R_COMP = 2.8;
+
+/* companion position. Orbit is drawn in the equatorial plane; the real system
+   is inclined 59.8 deg, which the camera pitch stands in for. */
+vec3 compPos(){
+  float ph = uTime * 0.22;
+  return vec3(cos(ph), 0.0, sin(ph)) * A_ORB;
+}
 
 /* emission at p; also returns the local absorption coefficient */
 vec3 pulsarEmit(vec3 p, out float ab){
@@ -1186,19 +1220,31 @@ vec3 pulsarEmit(vec3 p, out float ab){
   float tilt = uTilt;
   vec3  magAxis = normalize(vec3(sin(tilt)*cos(spinAng), cos(tilt), sin(tilt)*sin(spinAng)));
 
+  /* the gamma-ray beam does NOT share the radio beam's axis. Radio comes off
+     the open field lines right above the polar caps, so it hugs the magnetic
+     axis; gamma-rays come from the outer magnetosphere's current sheet, which
+     trails the axis. Giving them separate axes is both the physical situation
+     and the only way the two bands stay legible — pile them on one axis and the
+     green and magenta overlap into white, which is what the first attempt did
+     and why the reference art draws them as two distinct cone pairs. */
+  vec3  gamAxis = normalize(vec3(sin(tilt+0.42)*cos(spinAng-0.55), cos(tilt+0.42),
+                                 sin(tilt+0.42)*sin(spinAng-0.55)));
+
   float rp = max(r, R_STAR*0.3);
   float cosTheta = dot(p, magAxis) / rp;
+  float cosGam   = dot(p, gamAxis) / rp;
 
-  /* two oppositely-directed lighthouse beams along the magnetic axis. Decay
-     has to be steep (not the black hole jet's gentle falloff) — this scene
-     integrates over a much longer, coarser-stepped path, so a slowly-fading
-     density accumulates into a wash of light rather than a contained beam. */
-  float beamA = pow(max(cosTheta, 0.0), 26.0);
-  float beamB = pow(max(-cosTheta, 0.0), 26.0);
-  float beam  = (beamA + beamB) * smoothstep(R_STAR*1.05, R_STAR*2.2, r) * exp(-r*0.55);
+  /* two oppositely-directed lighthouse beams per band. Decay has to be steep
+     (not the black hole jet's gentle falloff) — this scene integrates over a
+     much longer, coarser-stepped path, so a slowly-fading density accumulates
+     into a wash of light rather than a contained beam. */
+  float falloff = smoothstep(R_STAR*1.05, R_STAR*2.2, r) * exp(-r*0.55);
+  float radio = pow(abs(cosTheta), 20.0) * falloff;
+  float gamma = pow(abs(cosGam),   34.0) * falloff;
   /* faint turbulent flicker along the beam so it doesn't look like a static cone */
   float flick = 0.75 + 0.5*vnoise(vec3(cosTheta*30.0, r*1.4 - uTime*uSpin*6.0, 0.0));
-  beam *= flick;
+  radio *= flick; gamma *= flick;
+  float beam = radio + gamma;
 
   /* stylized dipole-shaped magnetosphere glow — denser away from the poles,
      same sin²(latitude) shape a real dipole field's equatorial belt has,
@@ -1206,14 +1252,45 @@ vec3 pulsarEmit(vec3 p, out float ab){
   float dipole = (1.0 - cosTheta*cosTheta) * exp(-r*0.85) * smoothstep(R_STAR*0.95, R_STAR*1.3, r);
 
   float surface = smoothstep(R_STAR*1.02, R_STAR*0.88, r);
-  float gran    = fbm(normalize(p)*6.0 + uTime*0.15);
 
   vec3 col = vec3(0.0);
-  col += mix(vec3(1.3,1.5,2.0), vec3(1.7,1.8,2.1), gran) * surface * 1.6;
-  col += vec3(0.55,0.75,1.65) * beam * uBeam * 2.6;
+  /* granulation is only visible on the ~1-radius-wide surface shell, but fbm()
+     is the most expensive call in the scene — gating it here is worth more than
+     any other single change to this shader's frame time */
+  if(surface > 0.002){
+    float gran = fbm(normalize(p)*6.0 + uTime*0.15);
+    col += mix(vec3(1.3,1.5,2.0), vec3(1.7,1.8,2.1), gran) * surface * 4.5;
+  }
+  col += vec3(0.26,1.30,0.42) * radio * uBeam * 1.4;   // radio band
+  col += vec3(1.15,0.26,1.35) * gamma * uBeam * 1.9;   // gamma-ray band
   col += vec3(0.30,0.50,1.05) * dipole * uMag * 0.40;
 
   ab += (dipole*0.25 + beam*0.06) * 0.10;
+
+  /* --- the companion. A 0.032 M_sun stripped star, tidally locked, with its
+     facing hemisphere heated to ~6200 K by the pulsar wind while the far side
+     sits near 3000 K — the two-colour surface is a measurement, not a stylistic
+     choice (Romani et al. 2022 fit both hemispheres separately). Opaque like
+     the neutron star's own surface, for the same re-accumulation reason. --- */
+  vec3  cp  = compPos();
+  vec3  rel = p - cp;
+  float dc  = length(rel);
+  if(dc < R_COMP*2.6){
+    vec3  n     = rel / max(dc, 1e-4);
+    float lit   = dot(n, normalize(-cp));            // +1 = facing the pulsar
+    float day   = smoothstep(-0.20, 0.55, lit);
+    float shell = smoothstep(R_COMP*1.05, R_COMP*0.88, dc);
+    if(dc < R_COMP*0.97) ab += 60.0;
+    col += mix(vec3(0.34,0.07,0.02), vec3(1.35,1.16,0.90), day) * shell * 2.4;
+
+    /* ablated envelope: material boiled off the star, streaming away from the
+       pulsar, which is what "black widow" is describing */
+    float tailward = 0.55 + 0.9*max(dot(n, normalize(cp)), 0.0);
+    float env = exp(-(dc - R_COMP)*2.6) * smoothstep(R_COMP*0.95, R_COMP*1.10, dc);
+    col += vec3(1.45,0.52,0.10) * env * tailward * uComp * 0.32;
+    ab  += env * tailward * uComp * 0.10;
+  }
+
   return col;
 }
 

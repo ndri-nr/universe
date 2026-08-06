@@ -147,6 +147,7 @@ bindSlider('s-psspin','psSpin','v-psspin');
 bindSlider('s-psbeam','psBeam','v-psbeam');
 bindSlider('s-psmag','psMag','v-psmag');
 bindSlider('s-pstilt','psTilt','v-pstilt');
+bindSlider('s-pscomp','psComp','v-pscomp');
 bindSlider('s-nbdensity','nbDensity','v-nbdensity');
 bindSlider('s-nbproto','nbProto','v-nbproto');
 bindSlider('s-nbjet','nbJet','v-nbjet');

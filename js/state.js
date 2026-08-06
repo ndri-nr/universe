@@ -14,7 +14,7 @@ export const S = {
   comp: 0.0, sep: 8.0, flare: 1.0,
   arm: 1.0, dust: 1.0, core: 1.0, hii: 1.0, rot: 1.0,
   orbit: 1.0, sunl: 1.0, path: 1.0, detail: 1.0, belt: 1.0, bary: 0.0, smark: 1.0,
-  psSpin: 1.0, psBeam: 1.0, psMag: 1.0, psTilt: 0.65,
+  psSpin: 1.0, psBeam: 1.0, psMag: 1.0, psTilt: 0.65, psComp: 1.0,
   nbDensity: 1.0, nbProto: 1.0, nbJet: 1.0,
   scene: 'bh', scale: 0.9, steps: 300,
   focus: -1,            // -1 = whole system, 0..7 = planet, 8 = Sun
@@ -65,17 +65,23 @@ export const SCENES = {
         +'◆ SATURN RING SYSTEM: CASSINI DIVISION RESOLVED ◆ HELIOPAUSE AT 123 AU ◆'
   },
   ps: {
-    dist: 14.0, pitch: 0.32, min: 3.0, max: 40,
+    /* far enough out to hold the companion's 9-radius orbit in frame */
+    dist: 40.0, pitch: 0.32, min: 6.0, max: 90,
     lbl: 'timing array // node-07',
-    h1:  'PSR J0002+66',
-    sub: 'OBLIQUE ROTATOR &middot; P = 115 ms &middot; B = 1.2e8 T',
+    /* literal U+2212, not &minus; — h1 also feeds document.title, which is
+       plain text and would show the entity source */
+    h1:  'PSR J0952−0607',
+    sub: 'BLACK WIDOW MSP &middot; P = 1.4138 ms &middot; 2.35 M&#9737;',
     rlbl:'OBS RADIUS', runit:' r_ns', slbl:'MARCH STEPS',
     meters:['BEAM LUMINOSITY','MAGNETOSPHERE DENSITY','SPIN RATE',
-            'MAGNETIC OBLIQUITY','TIMING NOISE FLOOR'],
-    tick:'◆ TIMING ARRAY LOCKED ◆ SPIN PERIOD 115 ms · SLOWING 1.4e-15 s/s ◆ SURFACE FIELD 1.2e8 T '
-        +'◆ MAGNETIC AXIS OBLIQUE TO SPIN AXIS — THE OBLIQUE ROTATOR IS WHY IT PULSES AT ALL '
-        +'◆ LIGHT CYLINDER RADIUS 5,480 km ◆ TWIN LIGHTHOUSE BEAMS ALONG THE MAGNETIC POLES '
-        +'◆ DISPERSION MEASURE 116.5 pc·cm&#8315;&sup3; ◆ CLASSIFIED: ROTATION-POWERED PULSAR ◆'
+            'MAGNETIC OBLIQUITY','COMPANION ABLATION'],
+    tick:'◆ TIMING ARRAY LOCKED ◆ SPIN 707.31 Hz · P = 1.4137983550 ms — FASTEST IN THE GALACTIC DISK '
+        +'◆ MASS 2.35 ± 0.17 M&#9737; — HEAVIEST WELL-MEASURED NEUTRON STAR KNOWN '
+        +'◆ SURFACE FIELD 6.1e3 T · UNUSUALLY WEAK FOR A PULSAR, THE MARK OF A RECYCLED MSP '
+        +'◆ COMPANION 0.032 M&#9737; IN A 6.419 h ORBIT · DAY SIDE 6,200 K vs NIGHT SIDE 3,000 K '
+        +'◆ BLACK WIDOW: THE PULSAR WIND IS EVAPORATING THE STAR THAT SPUN IT UP '
+        +'◆ RADIO AND GAMMA-RAY BEAMS FROM SEPARATE EMISSION ZONES ◆ LIGHT CYLINDER RADIUS 67 km '
+        +'◆ SEXTANS · 0.97–1.74 kpc ◆ BEAM SWEEP SHOWN AT ≈1:2000 ◆'
   },
   nb: {
     /* dist must stay outside R_HALO (13 pc in FS_NEBULA) or the camera starts

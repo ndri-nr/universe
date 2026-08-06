@@ -108,16 +108,22 @@ function hudSolar(t, r){
   ];
 }
 
-/* --- Pulsar readouts. The oblique-rotator model: the beam runs along the
-   magnetic axis, tilted from the spin axis by psTilt, so BEAM PHASE tracks
-   whether that axis currently points anywhere near the line of sight —
-   that misalignment is the entire reason a pulsar pulses instead of just
-   glowing steadily. --- */
+/* --- Pulsar readouts (PSR J0952-0607). The oblique-rotator model: the beam
+   runs along the magnetic axis, tilted from the spin axis by psTilt, so BEAM
+   PHASE tracks whether that axis currently points anywhere near the line of
+   sight — that misalignment is the entire reason a pulsar pulses instead of
+   just glowing steadily.
+
+   Real spin period is 1.4137983550 ms and the light cylinder is c*P/2pi = 67 km
+   = 5.6 stellar radii; the SPIN RATE slider scales both together, so the pair
+   stays self-consistent at any setting. T_day tracks the ablation slider
+   because that is the physical link — the day side is 6200 K precisely because
+   the pulsar wind is depositing energy on it. --- */
 function hudPulsar(t, r){
-  const periodMs = 115 / Math.max(S.psSpin, 0.05);
-  $('ps-p').textContent = periodMs.toFixed(1) + ' ms';
+  const periodMs = 1.4138 / Math.max(S.psSpin, 0.05);
+  $('ps-p').textContent = periodMs.toFixed(4) + ' ms';
   $('ps-o').textContent = (S.psTilt*180/Math.PI).toFixed(1) + '°';
-  $('ps-l').textContent = (5480/Math.max(S.psSpin, 0.05)).toFixed(0) + ' km';
+  $('ps-l').textContent = (67/Math.max(S.psSpin, 0.05)).toFixed(1) + ' km';
 
   const phase = (t*S.psSpin*4) % (2*Math.PI);
   const pulsing = Math.abs(Math.cos(phase)) > 0.85;
@@ -125,8 +131,14 @@ function hudPulsar(t, r){
   pb.textContent = pulsing ? 'PULSE' : (phase*180/Math.PI).toFixed(0) + '°';
   pb.className = pulsing ? 'crit' : '';
 
+  /* orbital phase: compPos() in FS_PULSAR sweeps at uTime*0.22 rad/s */
+  const orb = ((t*0.22) % (2*Math.PI)) / (2*Math.PI);
+  $('ps-r').textContent = (orb*360).toFixed(0) + '° / 6.419 h';
+  const tday = 3000 + 3200*Math.min(S.psComp, 1.6)/1.0;
+  $('ps-t').textContent = Math.round(Math.min(tday, 11000)) + ' K / 3000 K';
+
   const link = $('t-l');
-  if(r < 3){ link.textContent = 'LIGHT CYLINDER'; link.className = 'warn'; }
+  if(r < 5.6){ link.textContent = 'INSIDE LIGHT CYLINDER'; link.className = 'warn'; }
   else { link.textContent = 'STABLE'; link.className = ''; }
 
   return [
@@ -134,7 +146,7 @@ function hudPulsar(t, r){
     S.psMag*36 + 7*Math.sin(t*1.6),
     S.psSpin*44 + 6*Math.sin(t*2.2),
     (S.psTilt/1.57)*100,
-    10 + 8*Math.abs(Math.sin(t*0.6))
+    S.psComp*38 + 6*Math.abs(Math.sin(t*0.9))
   ];
 }
 
