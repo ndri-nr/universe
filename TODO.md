@@ -14,7 +14,7 @@ Roadmap, in working order. Check items off as shipped.
 ## 3. Solar System scene (more depth)
 - [x] Pluto/Charon binary dwarf planet (mutual tidal lock)
 - [x] Comet with dust + ion tail, always pointing away from Sun, on a wildly eccentric orbit
-- [ ] Earth day/night terminator + city lights on the dark side
+- [x] Earth day/night terminator + city lights on the dark side
 - [ ] Clickable notable asteroids in the belt (Ceres, Vesta)
 - [ ] Make Saturn's rings more realistic
 
