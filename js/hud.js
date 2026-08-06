@@ -126,8 +126,21 @@ function hudHole(t, r){
   else { je.textContent = (S.pitch >= 0 ? 'NORTH +y' : 'SOUTH −y'); je.className = 'warn'; }
 
   const cm = $('t-cm');
-  if(S.comp < 0.02){ cm.textContent = 'NONE'; cm.className = ''; }
+  /* 0.004 matches FS_SCENE's own `uComp > 0.004` activation threshold — a
+     slightly higher cutoff here read as "stuck at NONE" for a first small
+     slider nudge, since the effect (and this readout) hadn't gone live yet. */
+  if(S.comp < 0.004){ cm.textContent = 'NONE'; cm.className = ''; }
   else { cm.textContent = S.comp.toFixed(2) + ' M_prim @ ' + S.sep.toFixed(1) + ' r_s'; cm.className = 'warn'; }
+
+  /* mirrors the ~9s flare cycle computed in FS_SCENE (uTime*0.11) */
+  const fl = $('t-fl');
+  if(S.flare < 0.004){ fl.textContent = 'DORMANT'; fl.className = ''; }
+  else {
+    const cyc = (t*0.11) % 1;
+    const env = Math.min(1, cyc/0.015) * Math.exp(-cyc*20);
+    if(env > 0.05){ fl.textContent = 'FLARING ' + (env*S.flare).toFixed(2); fl.className = 'crit'; }
+    else { fl.textContent = 'QUIESCENT'; fl.className = ''; }
+  }
 
   const link = $('t-l');
   if(r < 6){ link.textContent = 'TIDAL STRESS'; link.className = 'crit'; }

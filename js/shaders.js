@@ -95,6 +95,11 @@ uniform float uLens, uDisk, uSpin, uDopp, uJet;
    are the same number). uComp=0 collapses this exactly back to the single
    black hole case: its force term and horizon test both vanish. */
 uniform float uComp, uSep;
+/* Real Sgr A* flares roughly daily via magnetic reconnection in the
+   accretion flow, and VLTI/GRAVITY observations show the emission during a
+   flare tracking a compact hot spot orbiting near the ISCO — that's the
+   model reproduced below, not just a blanket brightness pulse. */
+uniform float uFlare;
 
 const float RS   = 1.0;          // event horizon
 const float PHOT = 1.5;          // photon sphere
@@ -301,6 +306,24 @@ void main(){
 
         float alpha = clamp(emis*0.30, 0.0, 1.0);
         col   += trans * c * emis * beam * grav * uDisk * 0.105;
+
+        /* ---- flare: fast-rise/exponential-decay burst from a hot spot
+           orbiting just outside the ISCO, repeating on a cycle ---- */
+        if(uFlare > 0.004){
+          float rHot   = RIN + 0.6;
+          float wHot   = uSpin * 1.9 * pow(rHot, -1.5) * 12.0;
+          float hotAng = uTime * wHot + 1.3;
+          float dAng   = mod(ang - hotAng + 3.14159265, 6.2831853) - 3.14159265;
+          float spot   = exp(-dAng*dAng*9.0) * exp(-pow((rh-rHot)*2.0, 2.0));
+          float cyc    = fract(uTime * 0.11);                    // ~9s between onsets
+          float env    = smoothstep(0.0, 0.015, cyc) * exp(-cyc*20.0);
+          float flare  = spot * env * uFlare * 55.0;
+          /* distinctly whiter/hotter than diskRamp's own innermost colour, so
+             the burst reads as a flash against the disk instead of just a
+             brighter patch of the same hue */
+          col += trans * vec3(1.85,1.95,2.20) * flare * beam * grav * uDisk;
+        }
+
         trans *= (1.0 - alpha*0.86);
       }
     }
