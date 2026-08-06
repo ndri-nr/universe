@@ -567,8 +567,14 @@ float iSphere(vec3 ro, vec3 rd, vec3 ce, float ra){
   return -b - sqrt(h);
 }
 
-/* per-planet surface albedo, sampled in a slowly spinning body frame */
-vec3 surface(int id, vec3 n){
+/* per-planet surface albedo, sampled in a slowly spinning body frame.
+   emissive is light the surface itself puts out — city lights on Earth's
+   night side — as opposed to sunlight it reflects, which is why it's a
+   separate out-param rather than baked into the returned albedo: the caller
+   only wants it added where dif (sunlight) is near zero. Every other planet
+   just leaves it black. */
+vec3 surface(int id, vec3 n, out vec3 emissive){
+  emissive = vec3(0.0);
   float sp = uTime * (0.22 + 0.05*float(8-id)) * uOrbit;
   float cs = cos(sp), sn = sin(sp);
   vec3 q = vec3(n.x*cs - n.z*sn, n.y, n.x*sn + n.z*cs);
@@ -590,6 +596,12 @@ vec3 surface(int id, vec3 n){
       : mix(vec3(0.01,0.07,0.26), vec3(0.04,0.19,0.46), clamp(land*1.7,0.0,1.0));
     c = mix(c, vec3(0.92,0.96,1.00), smoothstep(0.70,0.86, abs(lat)));
     float cloud = smoothstep(0.54,0.80, fbm(q*4.8 + vec3(uTime*0.02,0.0,0.0)));
+    /* city lights: small warm clusters, land only, dimmed under cloud cover
+       (from orbit, clouds really do hide city glow) — the caller masks this
+       to the night side, so it only shows up once the terminator crosses it */
+    float cities = pow(max(fbm(q*13.0 + 7.0) - 0.63, 0.0) * 2.8, 2.0);
+    float onLand  = smoothstep(0.52, 0.60, land);
+    emissive = vec3(1.00,0.82,0.45) * cities * onLand * (1.0 - cloud*0.75) * 0.95;
     return mix(c, vec3(0.96,0.98,1.00), cloud*0.55*d);
   }
   if(id == 3){                                    /* Mars: rust, maria, polar caps */
@@ -853,12 +865,16 @@ void main(){
     vec3 L = normalize(uSunPos - p);              // light from the displaced Sun
     float dif = max(dot(n, L), 0.0);
     float att = 1.0 / (1.0 + 0.011*length(p - uSunPos));   // gentler than inverse-square
-    vec3 base = (id < 9) ? surface(id, n) : (id <= 19) ? moonSurface(n, id)
+    vec3 emissive = vec3(0.0);
+    vec3 base = (id < 9) ? surface(id, n, emissive) : (id <= 19) ? moonSurface(n, id)
               : (id <= 21) ? plutoCharonSurface(n, id) : vec3(0.42,0.44,0.48);  // 22: comet nucleus, dirty ice
     /* fine mottling: invisible at system scale, gives the surface texture once
        you zoom in on a single body. Only costs anything on pixels that hit. */
     base *= 0.88 + 0.26*fbm(n*26.0) + 0.10*vnoise(n*70.0);
     col = base * (0.030 + dif*1.45*att*uSunL);
+    /* city lights only past the terminator, ramping in as the Sun drops
+       below the horizon rather than snapping on — real dusk does this too */
+    col += emissive * smoothstep(0.10, 0.0, dif);
     /* atmospheric limb glow on the bodies that have an atmosphere */
     float rim = pow(1.0 - max(dot(n, -rd), 0.0), 3.2);
     vec3 halo = (id==2) ? vec3(0.28,0.52,1.05)
