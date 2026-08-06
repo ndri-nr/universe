@@ -12,7 +12,7 @@ Roadmap, in working order. Check items off as shipped.
 - [x] M31 (Andromeda) visible in the distance — sets up the 4.5 Gyr collision the ticker already mentions
 
 ## 3. Solar System scene (more depth)
-- [ ] Pluto/Charon binary dwarf planet (mutual tidal lock)
+- [x] Pluto/Charon binary dwarf planet (mutual tidal lock)
 - [ ] Comet with dust + ion tail, always pointing away from Sun, on a wildly eccentric orbit
 - [ ] Earth day/night terminator + city lights on the dark side
 - [ ] Clickable notable asteroids in the belt (Ceres, Vesta)
