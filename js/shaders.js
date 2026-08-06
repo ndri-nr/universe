@@ -1181,11 +1181,12 @@ export const FS_PULSAR = GLSL_HEAD + `
 uniform float uSpin, uBeam, uMag, uTilt, uComp;
 
 const float R_STAR = 1.0;
-/* 16, not 40: nothing in this scene lives past the companion's orbit at 9 +
-   its 1.9 radius, and the beam falloff is exp(-r*0.55) — down to 3e-4 by r=15.
-   Shrinking the marched sphere both halves the samples and more than halves dt,
-   so the companion's surface shell actually resolves. */
-const float R_HALO = 16.0;
+/* 30. This was 16 while the beams died at exp(-r*0.55), i.e. by r~15; the beams
+   now run most of the way to the halo edge so they can actually cross the frame,
+   which is what the reference art looks like and what "lighthouse" implies.
+   Affordable because the per-sample cost dropped a lot at the same time — the
+   surface fbm that used to dominate this shader is gone. */
+const float R_HALO = 30.0;
 const float A_ORB  = 9.0;    // compressed orbital separation (see header)
 /* companion radius. True ratio to the neutron star is ~5800:1 (70,000 km of
    bloated, Roche-lobe-filling envelope against 12 km), so 2.8:1 still wildly
@@ -1234,16 +1235,85 @@ vec3 pulsarEmit(vec3 p, out float ab){
   float cosTheta = dot(p, magAxis) / rp;
   float cosGam   = dot(p, gamAxis) / rp;
 
-  /* two oppositely-directed lighthouse beams per band. Decay has to be steep
-     (not the black hole jet's gentle falloff) — this scene integrates over a
-     much longer, coarser-stepped path, so a slowly-fading density accumulates
-     into a wash of light rather than a contained beam. */
-  float falloff = smoothstep(R_STAR*1.05, R_STAR*2.2, r) * exp(-r*0.55);
-  float radio = pow(abs(cosTheta), 20.0) * falloff;
-  float gamma = pow(abs(cosGam),   34.0) * falloff;
-  /* faint turbulent flicker along the beam so it doesn't look like a static cone */
-  float flick = 0.75 + 0.5*vnoise(vec3(cosTheta*30.0, r*1.4 - uTime*uSpin*6.0, 0.0));
-  radio *= flick; gamma *= flick;
+
+  /* Two oppositely-directed lighthouse beams per band.
+
+     Three attempts landed here, and the failures are worth keeping:
+     - pow(cos, N) is a smooth bump with no edge at all, so the beams read as
+       soft smoke plumes however high N goes.
+     - a smoothstep across the opening angle, at flat brightness, gives a hard
+       boundary — and looks like a solid CGI searchlight cone, because nothing
+       physical has a straight edge and uniform surface brightness.
+     What plasma actually looks like: a bright core feathering off gradually,
+     dimming down its length, and shot through with filaments.
+
+     The shape fix that mattered: profile on PERPENDICULAR DISTANCE from the
+     axis, not on angle. Any angular profile makes width grow with distance, so
+     it can only ever produce a cone however it is tuned — every earlier attempt
+     was a variation on the same wrong shape. Perpendicular offset instead gives
+     a collimated shaft of near-constant width that just keeps going: long and
+     narrow, swelling to a barrel partway out and rounding off at the tip, which
+     is the baseball-bat silhouette the reference actually shows. It is also the
+     physical case — a pulsar wind is magnetically collimated, it does not expand
+     freely into a cone. */
+  float alongR = dot(p, magAxis), alongG = dot(p, gamAxis);
+  float aR = abs(alongR), aG = abs(alongG);
+  vec3  perpR = p - magAxis*alongR;
+  vec3  perpG = p - gamAxis*alongG;
+
+  /* width: a slim handle at the base swelling to a barrel, then held — this is
+     what makes it a bat rather than a laser or a cone */
+  float wR = 0.55 + 1.15*smoothstep(0.0, 16.0, aR);
+  float wG = 0.30 + 0.62*smoothstep(0.0, 16.0, aG);
+
+  /* A perfectly straight gaussian tube of perfectly smooth width is the one
+     thing that still read as artificial — geometrically rigid, like a rendered
+     rod. Two cheap irregularities fix that: the centreline WANDERS sideways as
+     it travels (held straight near the star, drifting further out, which is how
+     a real jet responds to the medium it is pushing through), and the width
+     breathes along the length instead of being a clean analytic swell.
+
+     Gated on a cheap pre-test — samples well off-axis contribute nothing, and
+     they are the overwhelming majority of the marched volume. */
+  float prR = length(perpR), prG = length(perpG);
+  if(prR < 7.0){
+    vec3 ref = (abs(magAxis.y) < 0.9) ? vec3(0.0,1.0,0.0) : vec3(1.0,0.0,0.0);
+    vec3 e1  = normalize(cross(magAxis, ref));
+    vec3 e2  = cross(magAxis, e1);
+    float w1 = vnoise(vec3(alongR*0.11, 3.1, 0.0)) - 0.5;
+    float w2 = vnoise(vec3(alongR*0.11, 8.7, 0.0)) - 0.5;
+    prR = length(perpR - (e1*w1 + e2*w2) * 3.4 * smoothstep(1.0, 22.0, aR));
+    wR *= 0.72 + 0.56*vnoise(vec3(alongR*0.24, 17.0, 0.0));
+  }
+  if(prG < 5.0){
+    vec3 ref = (abs(gamAxis.y) < 0.9) ? vec3(0.0,1.0,0.0) : vec3(1.0,0.0,0.0);
+    vec3 e1  = normalize(cross(gamAxis, ref));
+    vec3 e2  = cross(gamAxis, e1);
+    float w1 = vnoise(vec3(alongG*0.11, 21.5, 0.0)) - 0.5;
+    float w2 = vnoise(vec3(alongG*0.11, 29.3, 0.0)) - 0.5;
+    prG = length(perpG - (e1*w1 + e2*w2) * 2.6 * smoothstep(1.0, 22.0, aG));
+    wG *= 0.72 + 0.56*vnoise(vec3(alongG*0.24, 33.0, 0.0));
+  }
+  /* length: run all the way to the halo bound so the shafts cross the frame,
+     rounding off softly at the tip so the cut never shows as an edge */
+  float lenR = smoothstep(R_STAR*1.05, R_STAR*3.2, aR) * (1.0 - smoothstep(24.0, 30.0, aR));
+  float lenG = smoothstep(R_STAR*1.05, R_STAR*3.2, aG) * (1.0 - smoothstep(25.0, 30.0, aG));
+  /* gentle dimming down the shaft; the radial term keeps it off the star itself */
+  float dimR = exp(-aR*0.030) * smoothstep(R_STAR*0.9, R_STAR*1.6, r);
+  float dimG = exp(-aG*0.026) * smoothstep(R_STAR*0.9, R_STAR*1.6, r);
+
+  float radio = exp(-prR*prR/(wR*wR)) * lenR * dimR;
+  float gamma = exp(-prG*prG/(wG*wG)) * lenG * dimG;
+
+  /* Filaments running ALONG the shaft, so it striates like a real jet instead of
+     flickering as a whole. Gated to samples actually inside a beam — the shafts
+     are a small part of the marched sphere, and once the surface fbm was removed
+     an ungated vnoise here was most of the shader's cost. */
+  if(radio + gamma > 0.012){
+    vec3  perp = p - magAxis*alongR;
+    float fil  = 0.42 + 0.92*vnoise(perp*1.55 + vec3(0.0, 0.0, alongR*0.40 - uTime*uSpin*2.2));
+    radio *= fil; gamma *= fil;
+  }
   float beam = radio + gamma;
 
   /* stylized dipole-shaped magnetosphere glow — denser away from the poles,
@@ -1251,18 +1321,19 @@ vec3 pulsarEmit(vec3 p, out float ab){
      not literal field-line tracing. Same steep-decay reasoning as the beam. */
   float dipole = (1.0 - cosTheta*cosTheta) * exp(-r*0.85) * smoothstep(R_STAR*0.95, R_STAR*1.3, r);
 
-  float surface = smoothstep(R_STAR*1.02, R_STAR*0.88, r);
+  /* The star: a hard-edged, uniformly brilliant disc. The fbm granulation that
+     used to be here was wrong twice over — it was the single most expensive call
+     in the shader, and a 12 km surface at 3e6 K has no visible granulation to
+     resolve anyway; it just made the star look like a fuzzy tennis ball. A tight
+     shell plus a sharp limb reads as "impossibly dense pinpoint", which is the
+     truthful impression. */
+  float surface = smoothstep(R_STAR*1.005, R_STAR*0.97, r);
+  float limb    = smoothstep(R_STAR*0.80, R_STAR*1.00, r);   // hot rim
 
   vec3 col = vec3(0.0);
-  /* granulation is only visible on the ~1-radius-wide surface shell, but fbm()
-     is the most expensive call in the scene — gating it here is worth more than
-     any other single change to this shader's frame time */
-  if(surface > 0.002){
-    float gran = fbm(normalize(p)*6.0 + uTime*0.15);
-    col += mix(vec3(1.3,1.5,2.0), vec3(1.7,1.8,2.1), gran) * surface * 4.5;
-  }
-  col += vec3(0.26,1.30,0.42) * radio * uBeam * 1.4;   // radio band
-  col += vec3(1.15,0.26,1.35) * gamma * uBeam * 1.9;   // gamma-ray band
+  col += (vec3(1.45,1.62,2.10) + vec3(0.30,0.24,0.10)*limb) * surface * 3.2;
+  col += vec3(0.24,1.30,0.40) * radio * uBeam * 0.52;   // radio band
+  col += vec3(1.15,0.24,1.35) * gamma * uBeam * 0.70;   // gamma-ray band
   col += vec3(0.30,0.50,1.05) * dipole * uMag * 0.40;
 
   ab += (dipole*0.25 + beam*0.06) * 0.10;
@@ -1272,23 +1343,58 @@ vec3 pulsarEmit(vec3 p, out float ab){
      sits near 3000 K — the two-colour surface is a measurement, not a stylistic
      choice (Romani et al. 2022 fit both hemispheres separately). Opaque like
      the neutron star's own surface, for the same re-accumulation reason. --- */
-  vec3  cp  = compPos();
-  vec3  rel = p - cp;
-  float dc  = length(rel);
-  if(dc < R_COMP*2.6){
-    vec3  n     = rel / max(dc, 1e-4);
-    float lit   = dot(n, normalize(-cp));            // +1 = facing the pulsar
+  vec3  cp   = compPos();
+  vec3  toNS = normalize(-cp);          // from companion towards the pulsar
+  vec3  rel  = p - cp;
+  float dc   = length(rel);
+  if(dc < R_COMP*3.2){
+    vec3  n   = rel / max(dc, 1e-4);
+    float lit = dot(n, toNS);           // +1 = facing the pulsar
+
+    /* Teardrop, not a sphere. At this separation the companion is close to
+       filling its Roche lobe, so it is tidally stretched into a lobe pointing at
+       the pulsar and slightly flattened at the far end — a plain ball is the one
+       shape a black-widow donor definitely is not. Implemented as a
+       direction-dependent radius, which is enough for a smooth blob at this size
+       and avoids a real Roche-potential solve. */
+    float lobe = R_COMP * (1.0 + 0.30*pow(max(lit, 0.0), 1.6) - 0.05*max(-lit, 0.0));
+
     float day   = smoothstep(-0.20, 0.55, lit);
-    float shell = smoothstep(R_COMP*1.05, R_COMP*0.88, dc);
-    if(dc < R_COMP*0.97) ab += 60.0;
+    float shell = smoothstep(lobe*1.03, lobe*0.90, dc);
+    if(dc < lobe*0.97) ab += 60.0;
     col += mix(vec3(0.34,0.07,0.02), vec3(1.35,1.16,0.90), day) * shell * 2.4;
 
-    /* ablated envelope: material boiled off the star, streaming away from the
-       pulsar, which is what "black widow" is describing */
-    float tailward = 0.55 + 0.9*max(dot(n, normalize(cp)), 0.0);
-    float env = exp(-(dc - R_COMP)*2.6) * smoothstep(R_COMP*0.95, R_COMP*1.10, dc);
-    col += vec3(1.45,0.52,0.10) * env * tailward * uComp * 0.32;
-    ab  += env * tailward * uComp * 0.10;
+    /* ablated envelope, brightest on the irradiated side that is doing the
+       evaporating */
+    float env = exp(-(dc - lobe)*2.6) * smoothstep(lobe*0.95, lobe*1.10, dc);
+    col += vec3(1.45,0.52,0.10) * env * (0.55 + 0.9*max(lit, 0.0)) * uComp * 0.32;
+    ab  += env * uComp * 0.10;
+  }
+
+  /* --- the stream. Material leaving the companion's inner Lagrange point and
+     running towards the pulsar, which is the actual mechanism behind the name:
+     this is the mass transfer that spun a 1.4 ms pulsar up in the first place,
+     now running in reverse as the pulsar wind boils the donor away. Trailed
+     sideways because the pair is orbiting — matter does not fall along a
+     straight line between two moving bodies. --- */
+  {
+    vec3  along = -toNS;                                   // pulsar -> companion
+    vec3  side  = normalize(cross(vec3(0.0,1.0,0.0), along));
+    float t     = dot(p - cp, -along);                     // 0 at donor, A_ORB at pulsar
+    float f     = clamp(t / A_ORB, 0.0, 1.0);
+    /* lag grows downstream, so the stream bows rather than pointing straight in */
+    vec3  axis  = cp - along*(t) + side*(f*f*2.6);
+    float off   = length(p - axis);
+    float width = 0.42 + 0.55*f;                           // widens as it spreads
+    /* same gating reason as the beam flicker: the stream is a thin tube through
+       a large volume, so the noise is only worth evaluating near it */
+    if(off < width*2.5){
+      float turb = 0.6 + 0.7*vnoise(vec3(f*9.0 - uTime*1.4, off*3.0, 0.0));
+      float s    = exp(-off*off/(width*width)) * smoothstep(0.0, 0.22, f)
+                 * (1.0 - smoothstep(0.72, 1.0, f)) * turb;
+      col += vec3(1.30,0.62,0.22) * s * uComp * 0.55;
+      ab  += s * uComp * 0.05;
+    }
   }
 
   return col;
@@ -1308,7 +1414,11 @@ void main(){
     float sq = sqrt(disc);
     float t0 = max(-b - sq, 0.0);
     float t1 = -b + sq;
-    int   ns = min(uSteps, 220);
+    /* the marched sphere nearly doubled (r=16 -> 30) so the beams can run the
+       length of the frame. 140 keeps dt near 0.43 over the 60-unit chord, which
+       the companion's surface shell still resolves; the beams themselves are
+       smooth gaussians and would tolerate far less. */
+    int   ns = min(uSteps, 140);
     float dt = (t1 - t0) / float(ns);
     float jit = h13(vec3(gl_FragCoord.xy, floor(uTime*24.0)));
     float t = t0 + dt*jit;
@@ -1348,11 +1458,12 @@ float fbm3(vec3 p){
   return s;
 }
 
-/* 13 pc, not the 26 it started at: the protostars sit ~4 pc out, so on a 26 pc
-   cloud their ionized cavity was a few percent of the frame and the whole
-   thing read as undifferentiated red mush. Halving the halo makes the cavity a
-   third of the cloud, which is roughly the M16 proportion. */
-const float R_HALO = 13.0;
+/* 18 pc. Was 26 (cavity too small a fraction of frame, all red mush), then 13
+   (right proportions but the cloud read as a ball). Now the envelope inside this
+   is anisotropic and noise-bounded rather than spherical, so the halo is only a
+   march bound — the gas fills the frame and its edge is off-screen at the
+   default distance, which is how a nebula actually presents. */
+const float R_HALO = 18.0;
 const int   PROTO_N = 5;
 const vec3  PROTO_POS[5] = vec3[5](
   vec3( 3.2, 1.1,-2.0),
@@ -1421,19 +1532,47 @@ vec3 nebulaEmit(vec3 p, out float ab){
   float r = length(p);
   if(r > R_HALO) return col;
 
-  /* billowy turbulent structure at three scales. n1 gates the other two: the
+  /* Envelope shape. This used to be smoothstep on the plain radius, i.e. a
+     spherically symmetric falloff, and the result was unmistakably a ball of red
+     gas — the one thing a real emission nebula never looks like. Two changes fix
+     it, and both are just anisotropy:
+
+     - measure the falloff on a SQUASHED coordinate, so the complex is a
+       flattened, elongated sheet of gas rather than a globe;
+     - make the boundary radius itself a function of direction, driven by low
+       frequency noise, so the outer edge is ragged, lobed and asymmetric instead
+       of a circle. M16 has no outer edge at all in frame, and neither should
+       this at the default distance.
+
+     The march is still bounded by a sphere, but the envelope never reaches it,
+     so that boundary is not visible.
+
+     The order below matters for frame time: n1's gate is evaluated FIRST and
+     kills roughly half the volume, so the envelope's own noise is only paid for
+     on samples that survive it. Computing the envelope first cost about half
+     this scene's frame rate. */
+
+  /* billowy turbulent structure at three scales. n1 gates everything else: the
      hard smoothstep zeroes out a lot of the volume — that's both the frame
      budget and the point, since the empty lanes are what let background stars
      through and keep the cloud from reading as full-frame fog. */
   float n1 = fbm3(p*0.13 + vec3(0.0, uTime*0.006, 0.0));
   float shape = smoothstep(0.38, 0.68, n1);
   if(shape < 0.004) return col;
+
+  vec3  ps = p * vec3(1.0, 1.62, 0.82);      // flattened in y, slightly in z
+  float rs = length(ps);
+  /* one octave, not fbm3: this only has to make the boundary lobed and ragged at
+     very low frequency, where extra octaves are invisible */
+  float rEdge = R_HALO * (0.60 + 0.52*vnoise(normalize(p)*1.9 + 37.0));
+  float env = smoothstep(rEdge, rEdge*0.34, rs);
+  if(env < 0.004) return col;
   /* single octave for the mid-scale modulator: it only has to break the large
      billows into lobes, and an fbm here was 5 more hash calls for nothing */
   float n2 = vnoise(p*0.34 + 11.0);
   float n3 = fbm3(p*0.95 + 23.0 - vec3(0.0, uTime*0.010, 0.0));
   shape *= (0.30 + 0.85*n2);
-  float dens = shape * (0.30 + 0.90*pow(n3,1.6)) * smoothstep(R_HALO, R_HALO*0.62, r);
+  float dens = shape * (0.30 + 0.90*pow(n3,1.6)) * env;
   /* radiation pressure has evacuated the cavity around the cluster */
   dens *= uDensity / (1.0 + ion*1.6);
 

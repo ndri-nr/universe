@@ -208,7 +208,7 @@ function hudNebula(t, r){
   $('nb-n').textContent = (Math.abs(r - 3.93) + 0.4*Math.sin(t*0.25)).toFixed(2) + ' pc';
 
   const link = $('t-l');
-  if(r < 13){ link.textContent = 'IN CLOUD CORE'; link.className = 'warn'; }
+  if(r < 18){ link.textContent = 'IN CLOUD CORE'; link.className = 'warn'; }
   else { link.textContent = 'STABLE'; link.className = ''; }
 
   return [

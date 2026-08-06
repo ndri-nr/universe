@@ -67,8 +67,11 @@ export const SCENES = {
         +'◆ SATURN RING SYSTEM: CASSINI DIVISION RESOLVED ◆ HELIOPAUSE AT 123 AU ◆'
   },
   ps: {
-    /* far enough out to hold the companion's 9-radius orbit in frame */
-    dist: 40.0, pitch: 0.32, min: 6.0, max: 90,
+    /* 33, not 40: the beams now run out to ~25 radii, so they carry the
+       composition and the frame no longer has to be sized around the companion's
+       9-radius orbit alone. Lower pitch too — nearer the orbital plane the pair
+       reads as a pair rather than as two unrelated dots. */
+    dist: 33.0, pitch: 0.18, min: 6.0, max: 90,
     lbl: 'timing array // node-07',
     /* literal U+2212, not &minus; — h1 also feeds document.title, which is
        plain text and would show the entity source */
@@ -86,12 +89,14 @@ export const SCENES = {
         +'◆ SEXTANS · 0.97–1.74 kpc ◆ BEAM SWEEP SHOWN AT ≈1:2000 ◆'
   },
   nb: {
-    /* dist must stay outside R_HALO (13 pc in FS_NEBULA) or the camera starts
-       inside the gas and the cloud fills the frame as a flat wall */
-    dist: 30.0, pitch: 0.30, min: 8.0, max: 70,
+    /* 26: closer than the 18 pc envelope's outer reach, so the ragged edge of
+       the complex sits off-frame and the gas fills the view the way a real
+       nebula does — the structure comes from the dark lanes and voids inside it,
+       not from seeing the cloud's silhouette. */
+    dist: 26.0, pitch: 0.22, min: 8.0, max: 80,
     lbl: 'infrared survey // node-07',
     h1:  'NGC 6611-B',
-    sub: 'H II EMISSION NEBULA &middot; 5 PROTOSTARS &middot; R &asymp; 13 pc',
+    sub: 'H II EMISSION NEBULA &middot; 5 PROTOSTARS &middot; R &asymp; 18 pc',
     rlbl:'OBS RADIUS', runit:' pc', slbl:'MARCH STEPS',
     meters:['CLOUD DENSITY','PROTOSTAR LUMINOSITY','JET ACTIVITY',
             'DUST EXTINCTION','BACKGROUND NOISE'],
